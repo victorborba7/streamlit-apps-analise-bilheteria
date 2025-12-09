@@ -2,17 +2,47 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
+from io import BytesIO
+from urllib.parse import quote
 
 
 # ==============================
 # Carregamento dos dados
 # ==============================
+def load_file_from_github(url, headers):
+    """Baixa arquivo do GitHub com autenticação"""
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    
+    # Debug: verifica se o conteúdo é realmente um arquivo Excel
+    content = response.content
+    if len(content) < 100 or content[:4] != b'PK\x03\x04':
+        # Não é um arquivo ZIP/Excel válido
+        st.error(f"❌ Erro ao baixar arquivo de: {url}")
+        st.error(f"Tamanho do conteúdo: {len(content)} bytes")
+        st.error(f"Primeiros bytes: {content[:100]}")
+        raise ValueError(f"Arquivo baixado não é um Excel válido. URL: {url}")
+    
+    file_obj = BytesIO(content)
+    file_obj.seek(0)  # Garante que o ponteiro está no início
+    return file_obj
+
+
 @st.cache_data
 def load_data():
+    # Base URL do repositório GitHub (raw)
+    github_pat = st.secrets["github_pat"]
+    github_base = "https://raw.githubusercontent.com/victorborba7/streamlit-apps-analise-bilheteria-data/main/data/raw"
+    
+    headers = {"Authorization": f"Bearer {github_pat}"}
+    
     # ==============================
     # Bilhetagem principal
     # ==============================
-    bilhetes = pd.read_excel("data/raw/Arena Jockey - Levantamento vendas 04122025.xlsx")
+    bilhetes_filename = quote("ArenaJockey.xlsx")
+    bilhetes_url = f"{github_base}/{bilhetes_filename}"
+    bilhetes = pd.read_excel(load_file_from_github(bilhetes_url, headers), sheet_name="ArenaJockey", engine='openpyxl')
 
     if "TDL Event Date" in bilhetes.columns:
         bilhetes["TDL Event Date"] = pd.to_datetime(bilhetes["TDL Event Date"])
@@ -25,8 +55,9 @@ def load_data():
     # Bilhetagem Marisa Monte
     # ==============================
     marisa = pd.read_excel(
-        "data/raw/Rio de Janeiro Público Marisa Monte_final.xlsx",
-        sheet_name="Vendas"
+        load_file_from_github(bilhetes_url, headers),
+        sheet_name="MarisaMonte",
+        engine='openpyxl'
     )
 
     # Coluna J = índice 9
@@ -52,18 +83,31 @@ def load_data():
     # ==============================
     # Credenciamento
     # ==============================
-    cred_2025 = pd.read_excel("data/raw/CREDENCIAMENTO_Planilha_AC.xlsx", sheet_name="GERAL 2025", header=4)
-    desm_2024 = pd.read_excel("data/raw/CREDENCIAMENTO_Planilha_AC.xlsx", sheet_name="Desmontagem 2024", header=2)
+    cred_filename = quote("CREDENCIAMENTO_Planilha_AC.xlsx")
+    cred_url = f"{github_base}/{cred_filename}"
+    cred_2025 = pd.read_excel(load_file_from_github(cred_url, headers), sheet_name="GERAL 2025", header=4, engine='openpyxl')
+    desm_2024 = pd.read_excel(load_file_from_github(cred_url, headers), sheet_name="Desmontagem 2024", header=2, engine='openpyxl')
+    
+    # Normaliza os nomes das colunas
+    cred_2025.columns = cred_2025.columns.str.strip().str.upper()
+    desm_2024.columns = desm_2024.columns.str.strip().str.upper()
+    
+    # Garante que ambas as planilhas tenham a coluna QTD
+    # Se não tiver QTD, conta cada linha como 1 profissional
+    if "QTD" not in cred_2025.columns:
+        cred_2025["QTD"] = 1
+    if "QTD" not in desm_2024.columns:
+        desm_2024["QTD"] = 1
     
     # Adiciona coluna de origem
-    cred_2025["Origem"] = "2025"
-    desm_2024["Origem"] = "Desmontagem 2024"
+    cred_2025["ORIGEM"] = "2025"
+    desm_2024["ORIGEM"] = "Desmontagem 2024"
     
     # Concatena os dados de credenciamento
     cred = pd.concat([cred_2025, desm_2024], ignore_index=True)
 
     if "DATA" in cred.columns:
-        cred["DATA"] = pd.to_datetime(cred["DATA"])
+        cred["DATA"] = pd.to_datetime(cred["DATA"], errors="coerce")
 
     return bilhetes_final, cred
 
@@ -656,7 +700,7 @@ def main():
 
         # Tabela
         st.markdown("#### Amostra dos dados de bilhetagem")
-        st.dataframe(df_b.head(50))
+        st.dataframe(df_b)
 
     # ==============================
     # ABA 2 – CREDENCIAMENTO
@@ -691,15 +735,15 @@ def main():
             etapa_sel = []
 
         # Categoria
-        if "Categoria" in cred.columns:
-            categorias = sorted(cred["Categoria"].dropna().unique())
+        if "CATEGORIA" in cred.columns:
+            categorias = sorted(cred["CATEGORIA"].dropna().unique())
             cat_sel = col2.multiselect("Categoria", categorias)
         else:
             cat_sel = []
 
         # Empresa
-        if "Empresa" in cred.columns:
-            empresas = sorted(cred["Empresa"].dropna().unique())
+        if "EMPRESA" in cred.columns:
+            empresas = sorted(cred["EMPRESA"].dropna().unique())
             emp_sel = col3.multiselect("Empresa", empresas)
         else:
             emp_sel = []
@@ -708,8 +752,8 @@ def main():
         col4, col5, col6 = st.columns(3)
 
         # Origem (2025 ou Desmontagem 2024)
-        if "Origem" in cred.columns:
-            origens = sorted(cred["Origem"].dropna().unique())
+        if "ORIGEM" in cred.columns:
+            origens = sorted(cred["ORIGEM"].dropna().unique())
             origem_sel = col4.multiselect("Ano/Evento", origens)
         else:
             origem_sel = []
@@ -727,56 +771,48 @@ def main():
 
         if etapa_sel and "ETAPA" in df_c.columns:
             df_c = df_c[df_c["ETAPA"].isin(etapa_sel)]
-        if cat_sel and "Categoria" in df_c.columns:
-            df_c = df_c[df_c["Categoria"].isin(cat_sel)]
-        if emp_sel and "Empresa" in df_c.columns:
-            df_c = df_c[df_c["Empresa"].isin(emp_sel)]
-        if origem_sel and "Origem" in df_c.columns:
-            df_c = df_c[df_c["Origem"].isin(origem_sel)]
+        if cat_sel and "CATEGORIA" in df_c.columns:
+            df_c = df_c[df_c["CATEGORIA"].isin(cat_sel)]
+        if emp_sel and "EMPRESA" in df_c.columns:
+            df_c = df_c[df_c["EMPRESA"].isin(emp_sel)]
+        if origem_sel and "ORIGEM" in df_c.columns:
+            df_c = df_c[df_c["ORIGEM"].isin(origem_sel)]
         if dia_semana_cred_sel and "dia_label" in df_c.columns:
             df_c = df_c[df_c["dia_label"].isin(dia_semana_cred_sel)]
-
-        # Debug: mostra colunas disponíveis
-        with st.expander("🔍 Debug - Colunas disponíveis"):
-            st.write(f"Colunas no DataFrame: {list(df_c.columns)}")
-            st.write(f"Total de registros após filtros: {len(df_c)}")
-            if not df_c.empty:
-                st.write("Primeiras linhas:")
-                st.dataframe(df_c.head())
 
         # Métricas gerais
         st.markdown("#### Visão geral")
         col_a, col_b, col_c = st.columns(3)
 
-        if "Qtd" in df_c.columns:
-            total_profissionais = df_c["Qtd"].sum()
+        if "QTD" in df_c.columns:
+            total_profissionais = df_c["QTD"].sum()
             col_a.metric("Total de profissionais", int(total_profissionais))
         
-        if "Categoria" in df_c.columns:
-            total_categorias = df_c["Categoria"].nunique()
+        if "CATEGORIA" in df_c.columns:
+            total_categorias = df_c["CATEGORIA"].nunique()
             col_b.metric("Categorias únicas", int(total_categorias))
         
-        if "Empresa" in df_c.columns:
-            total_empresas = df_c["Empresa"].nunique()
+        if "EMPRESA" in df_c.columns:
+            total_empresas = df_c["EMPRESA"].nunique()
             col_c.metric("Empresas envolvidas", int(total_empresas))
 
         st.markdown("#### (a) Total de profissionais por categoria e etapa")
-        if not df_c.empty and "Categoria" in df_c.columns and "ETAPA" in df_c.columns and "Qtd" in df_c.columns:
+        if not df_c.empty and "CATEGORIA" in df_c.columns and "ETAPA" in df_c.columns and "QTD" in df_c.columns:
             total_cat_etapa = (
-                df_c.groupby(["Categoria", "ETAPA"])["Qtd"]
+                df_c.groupby(["CATEGORIA", "ETAPA"])["QTD"]
                 .sum()
                 .reset_index()
             )
 
             fig_total = px.bar(
                 total_cat_etapa,
-                x="Categoria",
-                y="Qtd",
+                x="CATEGORIA",
+                y="QTD",
                 color="ETAPA",
                 barmode="stack",
                 labels={
-                    "Categoria": "Categoria",
-                    "Qtd": "Total de profissionais",
+                    "CATEGORIA": "Categoria",
+                    "QTD": "Total de profissionais",
                     "ETAPA": "Etapa"
                 },
                 title="Total de profissionais por categoria e etapa (empilhado)"
@@ -788,18 +824,16 @@ def main():
             )
             
             st.plotly_chart(fig_total, use_container_width=True)
-        else:
-            st.warning(f"Gráfico (a) não pode ser exibido. Verificações: DataFrame vazio={df_c.empty}, Categoria={('Categoria' in df_c.columns)}, ETAPA={('ETAPA' in df_c.columns)}, Qtd={('Qtd' in df_c.columns)}")
 
         st.markdown("#### (b) Média de profissionais por categoria em cada dia do evento")
-        if not df_c.empty and "dia_label" in df_c.columns and "Categoria" in df_c.columns and "Qtd" in df_c.columns:
+        if not df_c.empty and "dia_label" in df_c.columns and "CATEGORIA" in df_c.columns and "QTD" in df_c.columns:
             # Filtra apenas os dias do evento (qua a dom)
             dias_evento = ["Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
             df_c_evento = df_c[df_c["dia_label"].isin(dias_evento)]
             
             if not df_c_evento.empty:
                 media_cat_dia = (
-                    df_c_evento.groupby(["dia_label", "Categoria"])["Qtd"]
+                    df_c_evento.groupby(["dia_label", "CATEGORIA"])["QTD"]
                     .mean()
                     .reset_index()
                 )
@@ -814,13 +848,13 @@ def main():
                 fig_media = px.bar(
                     media_cat_dia,
                     x="dia_label",
-                    y="Qtd",
-                    color="Categoria",
+                    y="QTD",
+                    color="CATEGORIA",
                     barmode="stack",
                     labels={
                         "dia_label": "Dia da Semana",
-                        "Qtd": "Média de profissionais",
-                        "Categoria": "Categoria"
+                        "QTD": "Média de profissionais",
+                        "CATEGORIA": "Categoria"
                     },
                     title="Média de profissionais por categoria em cada dia do evento"
                 )
@@ -829,13 +863,11 @@ def main():
                 st.plotly_chart(fig_media, use_container_width=True)
             else:
                 st.info("Não há dados para os dias do evento (quarta a domingo).")
-        else:
-            st.warning(f"Gráfico (b) não pode ser exibido. Verificações: DataFrame vazio={df_c.empty}, dia_label={('dia_label' in df_c.columns)}, Categoria={('Categoria' in df_c.columns)}, Qtd={('Qtd' in df_c.columns)}")
 
         st.markdown("#### Distribuição por dia da semana")
-        if not df_c.empty and "dia_label" in df_c.columns and "Qtd" in df_c.columns:
+        if not df_c.empty and "dia_label" in df_c.columns and "QTD" in df_c.columns:
             profissionais_por_dia = (
-                df_c.groupby("dia_label")["Qtd"]
+                df_c.groupby("dia_label")["QTD"]
                 .sum()
                 .reset_index()
             )
@@ -850,19 +882,17 @@ def main():
             fig_dia = px.bar(
                 profissionais_por_dia,
                 x="dia_label",
-                y="Qtd",
+                y="QTD",
                 labels={
                     "dia_label": "Dia da Semana",
-                    "Qtd": "Total de profissionais"
+                    "QTD": "Total de profissionais"
                 },
                 title="Total de profissionais por dia da semana"
             )
             st.plotly_chart(fig_dia, use_container_width=True)
-        else:
-            st.warning(f"Gráfico de distribuição não pode ser exibido. Verificações: DataFrame vazio={df_c.empty}, dia_label={('dia_label' in df_c.columns)}, Qtd={('Qtd' in df_c.columns)}")
 
         st.markdown("#### Amostra dos dados de credenciamento")
-        st.dataframe(df_c.head(50))
+        st.dataframe(df_c)
 
 
 if __name__ == "__main__":
