@@ -33,16 +33,16 @@ def load_file_from_github(url, headers):
 def load_data():
     # Base URL do repositório GitHub (raw)
     github_pat = st.secrets["github_pat"]
-    github_base = "https://raw.githubusercontent.com/victorborba7/streamlit-apps-analise-bilheteria-data/main/data/raw"
+    github_base = "https://raw.githubusercontent.com/victorborba7/streamlit-apps-analise-bilheteria-data/main"
     
     headers = {"Authorization": f"Bearer {github_pat}"}
     
     # ==============================
     # Bilhetagem principal
     # ==============================
-    bilhetes_filename = quote("ArenaJockey.xlsx")
+    bilhetes_filename = quote("base_unificada_arena_marisa_RA.xlsx")
     bilhetes_url = f"{github_base}/{bilhetes_filename}"
-    bilhetes = pd.read_excel(load_file_from_github(bilhetes_url, headers), sheet_name="ArenaJockey", engine='openpyxl')
+    bilhetes = pd.read_excel(load_file_from_github(bilhetes_url, headers), sheet_name="Sheet1", engine='openpyxl')
 
     if "TDL Event Date" in bilhetes.columns:
         bilhetes["TDL Event Date"] = pd.to_datetime(bilhetes["TDL Event Date"])
@@ -72,23 +72,23 @@ def load_data():
     # ==============================
     # Bilhetagem Marisa Monte
     # ==============================
-    marisa = pd.read_excel(
-        load_file_from_github(bilhetes_url, headers),
-        sheet_name="MarisaMonte",
-        engine='openpyxl'
-    )
+    # marisa = pd.read_excel(
+    #     load_file_from_github(bilhetes_url, headers),
+    #     sheet_name="MarisaMonte",
+    #     engine='openpyxl'
+    # )
 
-    # Coluna J = índice 9
-    marisa["CPF_LOGICO"] = marisa.iloc[:, 9].astype(str)
+    # # Coluna J = índice 9
+    # marisa["CPF_LOGICO"] = marisa.iloc[:, 9].astype(str)
 
-    # Cria estrutura compatível
-    marisa_ajustada = pd.DataFrame({
-        "TDL Event": "MARISA MONTE",
-        "TDL Event Date": pd.to_datetime(marisa.iloc[:, 0], errors="coerce"),
-        "TDL Customer CPF": marisa["CPF_LOGICO"],
-        "TDL Sum Tickets (B+S-A)": 1,
-        "TDL Sum Ticket Net Price (B+S-A)": pd.to_numeric(marisa.iloc[:, 5], errors="coerce"),
-    })
+    # # Cria estrutura compatível
+    # marisa_ajustada = pd.DataFrame({
+    #     "TDL Event": "MARISA MONTE",
+    #     "TDL Event Date": pd.to_datetime(marisa.iloc[:, 0], errors="coerce"),
+    #     "TDL Customer CPF": marisa["CPF_LOGICO"],
+    #     "TDL Sum Tickets (B+S-A)": 1,
+    #     "TDL Sum Ticket Net Price (B+S-A)": pd.to_numeric(marisa.iloc[:, 5], errors="coerce"),
+    # })
 
     # ==============================
     # Concatenação final
@@ -103,7 +103,7 @@ def load_data():
     # Credenciamento
     # ==============================
     cred_filename = quote("CREDENCIAMENTO_Planilha_AC.xlsx")
-    cred_url = f"{github_base}/{cred_filename}"
+    cred_url = f"{github_base}/data/raw/{cred_filename}"
     cred_2025 = pd.read_excel(load_file_from_github(cred_url, headers), sheet_name="GERAL 2025", header=4, engine='openpyxl')
     desm_2024 = pd.read_excel(load_file_from_github(cred_url, headers), sheet_name="Desmontagem 2024", header=2, engine='openpyxl')
     
