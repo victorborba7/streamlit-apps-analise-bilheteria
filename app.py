@@ -144,6 +144,26 @@ def load_data():
         
         # Concatena as duas versões
         artistico_processado = pd.concat([artistico_funcao1, artistico_funcao2], ignore_index=True)
+        
+        # Para artístico, usa NOME ou NOME COMPLETO como CPF se não houver CPF
+        cpf_cols_artistico = [col for col in artistico_processado.columns if 'CPF' in col.upper()]
+        if not cpf_cols_artistico:
+            # Se não tem coluna CPF, cria uma
+            if "NOME COMPLETO" in artistico_processado.columns:
+                artistico_processado["CPF"] = artistico_processado["NOME COMPLETO"]
+            elif "NOME" in artistico_processado.columns:
+                artistico_processado["CPF"] = artistico_processado["NOME"]
+        else:
+            # Se tem CPF mas está vazio, preenche com NOME COMPLETO ou NOME
+            cpf_col = cpf_cols_artistico[0]
+            if "NOME COMPLETO" in artistico_processado.columns:
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME COMPLETO"])
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].replace(['nan', 'None', 'NaN', ''], None)
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME COMPLETO"])
+            elif "NOME" in artistico_processado.columns:
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME"])
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].replace(['nan', 'None', 'NaN', ''], None)
+                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME"])
     else:
         artistico_processado = pd.DataFrame()
     
