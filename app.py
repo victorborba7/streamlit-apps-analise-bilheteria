@@ -47,9 +47,27 @@ def load_data():
     if "TDL Event Date" in bilhetes.columns:
         bilhetes["TDL Event Date"] = pd.to_datetime(bilhetes["TDL Event Date"])
 
-    # Garante CPF como string
+    # Garante CPF como string e padroniza formato
     if "TDL Customer CPF" in bilhetes.columns:
         bilhetes["TDL Customer CPF"] = bilhetes["TDL Customer CPF"].astype(str)
+        # Remove valores inválidos (nan, None, etc)
+        bilhetes["TDL Customer CPF"] = bilhetes["TDL Customer CPF"].replace(['nan', 'None', 'NaN', ''], None)
+        # Preenche com zeros à esquerda para ter 11 dígitos
+        bilhetes["TDL Customer CPF"] = bilhetes["TDL Customer CPF"].apply(
+            lambda x: x.zfill(11) if x is not None and x not in ['nan', 'None', 'NaN', ''] else None
+        )
+
+    # Processa data de nascimento e calcula idade
+    if "TDL Customer Birth Date" in bilhetes.columns:
+        bilhetes["TDL Customer Birth Date"] = pd.to_datetime(bilhetes["TDL Customer Birth Date"], errors="coerce")
+        bilhetes["Idade"] = (pd.Timestamp.now() - bilhetes["TDL Customer Birth Date"]).dt.days // 365
+        
+        # Cria faixas etárias
+        bilhetes["Faixa Etária"] = pd.cut(
+            bilhetes["Idade"],
+            bins=[0, 18, 25, 35, 45, 55, 65, 100],
+            labels=["Menor de 18", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+        )
 
     # ==============================
     # Bilhetagem Marisa Monte
@@ -75,10 +93,11 @@ def load_data():
     # ==============================
     # Concatenação final
     # ==============================
-    bilhetes_final = pd.concat(
-        [bilhetes, marisa_ajustada],
-        ignore_index=True
-    )
+    bilhetes_final = bilhetes.copy()
+    # pd.concat(
+    #     [bilhetes, marisa_ajustada],
+    #     ignore_index=True
+    # )
 
     # ==============================
     # Credenciamento
@@ -108,6 +127,36 @@ def load_data():
 
     if "DATA" in cred.columns:
         cred["DATA"] = pd.to_datetime(cred["DATA"], errors="coerce")
+    
+    # Converte todas as colunas object para string para evitar erros do PyArrow
+    # Exceto colunas numéricas e de data
+    for col in cred.columns:
+        if cred[col].dtype == 'object' and col != 'DATA':
+            cred[col] = cred[col].astype(str)
+    
+    # Tratamento especial para colunas de CPF no credenciamento
+    cpf_columns = [col for col in cred.columns if 'CPF' in col.upper()]
+    for col in cpf_columns:
+        # Remove valores inválidos
+        cred[col] = cred[col].replace(['nan', 'None', 'NaN', ''], None)
+        # Preenche com zeros à esquerda para ter 11 dígitos
+        cred[col] = cred[col].apply(
+            lambda x: x.zfill(11) if x is not None and x not in ['nan', 'None', 'NaN', '', 'None'] else None
+        )
+    
+    # Adiciona informação de evento baseado na data do credenciamento
+    # Cria mapeamento entre datas e eventos a partir da bilhetagem
+    if "TDL Event Date" in bilhetes_final.columns and "TDL Event" in bilhetes_final.columns:
+        mapa_data_evento = (
+            bilhetes_final[["TDL Event Date", "TDL Event"]]
+            .drop_duplicates()
+            .set_index("TDL Event Date")["TDL Event"]
+            .to_dict()
+        )
+        
+        # Mapeia evento baseado na data
+        if "DATA" in cred.columns:
+            cred["EVENTO"] = cred["DATA"].map(mapa_data_evento)
 
     return bilhetes_final, cred
 
@@ -560,6 +609,304 @@ def main():
         col_b.metric("Receita líquida (R$)", f"{total_receita:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col_c.metric("Clientes únicos", int(total_clientes))
 
+        # Novas métricas
+        st.markdown("---")
+        col_d, col_e, col_f = st.columns(3)
+        
+        media_ingressos_por_cpf = total_ingressos / total_clientes if total_clientes > 0 else 0
+        ticket_medio = total_receita / total_ingressos if total_ingressos > 0 else 0
+        
+        # Calcula clientes recorrentes (que foram a mais de 1 evento)
+        if "TDL Event" in df_b.columns:
+            clientes_recorrentes = df_b.groupby("TDL Customer CPF")["TDL Event"].nunique()
+            qtd_recorrentes = (clientes_recorrentes > 1).sum()
+            perc_recorrentes = (qtd_recorrentes / total_clientes * 100) if total_clientes > 0 else 0
+        else:
+            qtd_recorrentes = 0
+            perc_recorrentes = 0
+        
+        col_d.metric("Média de ingressos por CPF", f"{media_ingressos_por_cpf:.2f}")
+        col_e.metric("Ticket médio (R$)", f"{ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_f.metric("Clientes recorrentes", f"{qtd_recorrentes} ({perc_recorrentes:.1f}%)")
+        
+        # Botão de download das métricas
+        st.markdown("---")
+        metricas_resumo = pd.DataFrame({
+            "Métrica": [
+                "Total de ingressos",
+                "Receita líquida (R$)",
+                "Clientes únicos",
+                "Média de ingressos por CPF",
+                "Ticket médio (R$)",
+                "Clientes recorrentes (quantidade)",
+                "Clientes recorrentes (%)"
+            ],
+            "Valor": [
+                int(total_ingressos),
+                f"{total_receita:,.2f}",
+                int(total_clientes),
+                f"{media_ingressos_por_cpf:.2f}",
+                f"{ticket_medio:,.2f}",
+                int(qtd_recorrentes),
+                f"{perc_recorrentes:.1f}"
+            ]
+        })
+        
+        csv_metricas = metricas_resumo.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button(
+            label="📥 Download Métricas Gerais (CSV)",
+            data=csv_metricas,
+            file_name="metricas_bilhetagem.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+        # ==============================
+        # Análise de Comportamento de Compra
+        # ==============================
+        st.markdown("---")
+        st.markdown("### 📊 Análise de Comportamento de Compra")
+        
+        col_comp1, col_comp2 = st.columns(2)
+        
+        with col_comp1:
+            st.markdown("#### Distribuição de Ingressos por Cliente")
+            if not df_b.empty:
+                ingressos_por_cliente = (
+                    df_b.groupby("TDL Customer CPF")["TDL Sum Tickets (B+S-A)"]
+                    .sum()
+                    .reset_index()
+                )
+                
+                # Cria faixas de quantidade de ingressos
+                ingressos_por_cliente["Faixa"] = pd.cut(
+                    ingressos_por_cliente["TDL Sum Tickets (B+S-A)"],
+                    bins=[0, 1, 2, 3, 5, 10, float('inf')],
+                    labels=["1 ingresso", "2 ingressos", "3 ingressos", "4-5 ingressos", "6-10 ingressos", "Mais de 10"]
+                )
+                
+                dist_faixa = ingressos_por_cliente["Faixa"].value_counts().sort_index().reset_index()
+                dist_faixa.columns = ["Faixa", "Quantidade de Clientes"]
+                
+                fig_dist = px.bar(
+                    dist_faixa,
+                    x="Faixa",
+                    y="Quantidade de Clientes",
+                    labels={"Faixa": "Quantidade de Ingressos", "Quantidade de Clientes": "Clientes"},
+                    title="Quantos ingressos cada cliente comprou?"
+                )
+                st.plotly_chart(fig_dist, use_container_width=True)
+                
+                with st.expander("📊 Ver dados da tabela"):
+                    st.dataframe(dist_faixa, hide_index=True, use_container_width=True)
+        
+        with col_comp2:
+            st.markdown("#### Top 10 Clientes (por quantidade de ingressos)")
+            if not df_b.empty:
+                top_clientes = (
+                    df_b.groupby("TDL Customer CPF")[["TDL Sum Tickets (B+S-A)", "TDL Sum Ticket Net Price (B+S-A)"]]
+                    .sum()
+                    .reset_index()
+                    .sort_values("TDL Sum Tickets (B+S-A)", ascending=False)
+                    .head(10)
+                )
+                
+                top_clientes["Receita (R$)"] = top_clientes["TDL Sum Ticket Net Price (B+S-A)"].apply(
+                    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                )
+                
+                display_top = top_clientes[["TDL Customer CPF", "TDL Sum Tickets (B+S-A)", "Receita (R$)"]]
+                display_top.columns = ["CPF", "Ingressos", "Receita Total"]
+                st.dataframe(display_top, hide_index=True, use_container_width=True)
+                
+                # Expandir para mostrar detalhamento por dia da semana
+                with st.expander("📊 Ver detalhamento por dia da semana"):
+                    if "dia_semana_label" in df_b.columns:
+                        # Filtra apenas os top 10 CPFs
+                        top_cpfs = top_clientes["TDL Customer CPF"].tolist()
+                        df_top_detalhado = df_b[df_b["TDL Customer CPF"].isin(top_cpfs)]
+                        
+                        # Agrupa por CPF e dia da semana
+                        detalhamento_dia = (
+                            df_top_detalhado.groupby(["TDL Customer CPF", "dia_semana_label"])["TDL Sum Tickets (B+S-A)"]
+                            .sum()
+                            .reset_index()
+                        )
+                        
+                        # Cria tabela pivotada
+                        tabela_dia_semana = detalhamento_dia.pivot(
+                            index="TDL Customer CPF",
+                            columns="dia_semana_label",
+                            values="TDL Sum Tickets (B+S-A)"
+                        ).fillna(0).astype(int)
+                        
+                        # Ordena as colunas por dia da semana
+                        ordem_dias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+                        colunas_existentes = [dia for dia in ordem_dias if dia in tabela_dia_semana.columns]
+                        tabela_dia_semana = tabela_dia_semana[colunas_existentes]
+                        
+                        # Adiciona coluna de total
+                        tabela_dia_semana["Total"] = tabela_dia_semana.sum(axis=1)
+                        
+                        # Ordena por total descendente
+                        tabela_dia_semana = tabela_dia_semana.sort_values("Total", ascending=False)
+                        
+                        st.dataframe(tabela_dia_semana, use_container_width=True)
+                    else:
+                        st.info("Dados de dia da semana não disponíveis.")
+        
+        # Análise de recorrência
+        st.markdown("#### Análise de Recorrência - Clientes em Múltiplos Eventos")
+        if not df_b.empty and "TDL Event" in df_b.columns:
+            eventos_por_cliente = (
+                df_b.groupby("TDL Customer CPF")["TDL Event"]
+                .nunique()
+                .reset_index()
+            )
+            eventos_por_cliente.columns = ["CPF", "Eventos_Diferentes"]
+            
+            # Cria faixas
+            eventos_por_cliente["Faixa_Eventos"] = eventos_por_cliente["Eventos_Diferentes"].apply(
+                lambda x: f"{x} evento" if x == 1 else f"{x} eventos" if x <= 5 else "6+ eventos"
+            )
+            
+            dist_recorrencia = eventos_por_cliente["Faixa_Eventos"].value_counts().reset_index()
+            dist_recorrencia.columns = ["Eventos", "Clientes"]
+            
+            # Ordena as categorias
+            ordem_eventos = ["1 evento", "2 eventos", "3 eventos", "4 eventos", "5 eventos", "6+ eventos"]
+            dist_recorrencia["Eventos"] = pd.Categorical(dist_recorrencia["Eventos"], categories=ordem_eventos, ordered=True)
+            dist_recorrencia = dist_recorrencia.sort_values("Eventos")
+            
+            fig_recorrencia = px.pie(
+                dist_recorrencia,
+                values="Clientes",
+                names="Eventos",
+                title="Distribuição de clientes por número de eventos diferentes frequentados",
+                hole=0.4
+            )
+            st.plotly_chart(fig_recorrencia, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                st.dataframe(dist_recorrencia, hide_index=True, use_container_width=True)
+
+        # ==============================
+        # Dados Demográficos
+        # ==============================
+        st.markdown("---")
+        st.markdown("### 👥 Dados Demográficos")
+        
+        col_demo1, col_demo2 = st.columns(2)
+        
+        with col_demo1:
+            st.markdown("#### Distribuição por Gênero")
+            if "TDL Customer Salutation" in df_b.columns:
+                # Mapeia os valores para português ANTES de contar
+                mapa_genero = {
+                    "Mr": "Masculino",
+                    "Ms": "Feminino",
+                    "Sr": "Masculino",
+                    "Sr.": "Masculino",
+                    "Sra": "Feminino",
+                    "Sra.": "Feminino",
+                    "- no TDL data available -": "Não informado"
+                }
+                df_b_genero = df_b.copy()
+                df_b_genero["Gênero"] = df_b_genero["TDL Customer Salutation"].map(mapa_genero).fillna("Não informado")
+                
+                # Agora agrupa por gênero já mapeado
+                genero_count = df_b_genero.groupby("Gênero")["TDL Sum Tickets (B+S-A)"].sum().reset_index()
+                genero_count.columns = ["Gênero", "Quantidade"]
+                genero_count = genero_count.sort_values("Quantidade", ascending=False)
+                
+                fig_genero = px.pie(
+                    genero_count,
+                    values="Quantidade",
+                    names="Gênero",
+                    title="Ingressos por Gênero",
+                    hole=0.4
+                )
+                st.plotly_chart(fig_genero, use_container_width=True)
+                
+                with st.expander("📊 Ver dados da tabela"):
+                    st.dataframe(genero_count, hide_index=True, use_container_width=True)
+            else:
+                st.info("Dados de gênero não disponíveis na base de dados.")
+        
+        with col_demo2:
+            st.markdown("#### Distribuição por Faixa Etária")
+            if "Faixa Etária" in df_b.columns:
+                idade_count = df_b["Faixa Etária"].value_counts().sort_index().reset_index()
+                idade_count.columns = ["Faixa Etária", "Quantidade"]
+                
+                fig_idade = px.bar(
+                    idade_count,
+                    x="Faixa Etária",
+                    y="Quantidade",
+                    labels={"Faixa Etária": "Idade", "Quantidade": "Ingressos"},
+                    title="Ingressos por Faixa Etária"
+                )
+                st.plotly_chart(fig_idade, use_container_width=True)
+                
+                with st.expander("📊 Ver dados da tabela"):
+                    st.dataframe(idade_count, hide_index=True, use_container_width=True)
+            else:
+                st.info("Dados de faixa etária não disponíveis na base de dados.")
+        
+        # Cruzamento de dados demográficos
+        if "TDL Customer Salutation" in df_b.columns and "Faixa Etária" in df_b.columns:
+            st.markdown("#### Distribuição por Gênero e Faixa Etária")
+            
+            # Prepara os dados
+            df_demo = df_b[["TDL Customer Salutation", "Faixa Etária", "TDL Sum Tickets (B+S-A)"]].copy()
+            
+            # Mapeia gênero
+            mapa_genero = {
+                "Mr": "Masculino",
+                "Ms": "Feminino",
+                "Sr": "Masculino",
+                "Sr.": "Masculino",
+                "Sra": "Feminino",
+                "Sra.": "Feminino",
+                "- no TDL data available -": "Não informado"
+            }
+            df_demo["Gênero"] = df_demo["TDL Customer Salutation"].map(mapa_genero).fillna("Não informado")
+            
+            cruzamento = (
+                df_demo.groupby(["Faixa Etária", "Gênero"])["TDL Sum Tickets (B+S-A)"]
+                .sum()
+                .reset_index()
+            )
+            
+            fig_cruzamento = px.bar(
+                cruzamento,
+                x="Faixa Etária",
+                y="TDL Sum Tickets (B+S-A)",
+                color="Gênero",
+                barmode="group",
+                labels={
+                    "Faixa Etária": "Idade",
+                    "TDL Sum Tickets (B+S-A)": "Ingressos",
+                    "Gênero": "Gênero"
+                },
+                title="Distribuição de ingressos por gênero e faixa etária"
+            )
+            st.plotly_chart(fig_cruzamento, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                # Cria tabela pivotada para melhor visualização
+                tabela_cruzamento = cruzamento.pivot_table(
+                    index="Faixa Etária", 
+                    columns="Gênero", 
+                    values="TDL Sum Tickets (B+S-A)", 
+                    aggfunc='sum'
+                ).fillna(0)
+                tabela_cruzamento = tabela_cruzamento.astype(int)
+                st.dataframe(tabela_cruzamento, use_container_width=True)
+
+        st.markdown("---")
+        st.markdown("### 📍 Análises Geográficas")
+
         st.markdown("#### Ingressos ao longo do tempo")
         if not df_b.empty:
             vendas_por_dia = (
@@ -578,6 +925,12 @@ def main():
                 title="Ingressos vendidos por dia"
             )
             st.plotly_chart(fig_tempo, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                vendas_por_dia_display = vendas_por_dia.copy()
+                vendas_por_dia_display["TDL Event Date"] = vendas_por_dia_display["TDL Event Date"].dt.strftime("%d/%m/%Y")
+                vendas_por_dia_display.columns = ["Data", "Ingressos"]
+                st.dataframe(vendas_por_dia_display, hide_index=True, use_container_width=True)
 
         st.markdown("#### Top Regiões Administrativas (Ingressos)")
         if not df_b.empty:
@@ -587,18 +940,74 @@ def main():
                 .reset_index()
                 .sort_values("TDL Sum Tickets (B+S-A)", ascending=False)
             )
-
-            fig_ra = px.bar(
-                por_ra,
-                x="Região Administrativa",
-                y="TDL Sum Tickets (B+S-A)",
-                labels={
-                    "Região Administrativa": "Região Administrativa",
-                    "TDL Sum Tickets (B+S-A)": "Ingressos"
-                },
-                title="Ingressos por Região Administrativa"
-            )
-            st.plotly_chart(fig_ra, use_container_width=True)
+            
+            col_mapa_ra, col_bar_ra = st.columns([1, 1])
+            
+            with col_mapa_ra:
+                # Mapa com coordenadas centrais de cada região administrativa
+                coordenadas_ra = {
+                    "Zona Sul": (-22.9711, -43.1822),
+                    "Centro": (-22.9035, -43.1773),
+                    "Zona Norte": (-22.9025, -43.2785),
+                    "Zona Oeste": (-23.0052, -43.3153)
+                }
+                
+                por_ra_mapa = por_ra[por_ra["Região Administrativa"].isin(coordenadas_ra.keys())].copy()
+                por_ra_mapa["lat"] = por_ra_mapa["Região Administrativa"].map(lambda x: coordenadas_ra.get(x, (None, None))[0])
+                por_ra_mapa["lon"] = por_ra_mapa["Região Administrativa"].map(lambda x: coordenadas_ra.get(x, (None, None))[1])
+                por_ra_mapa = por_ra_mapa.dropna(subset=["lat", "lon"])
+                
+                if not por_ra_mapa.empty:
+                    # Normaliza valores para o tamanho dos círculos
+                    max_ingressos = por_ra_mapa["TDL Sum Tickets (B+S-A)"].max()
+                    por_ra_mapa["size"] = (por_ra_mapa["TDL Sum Tickets (B+S-A)"] / max_ingressos) * 100 + 20
+                    
+                    fig_mapa_ra = px.scatter_mapbox(
+                        por_ra_mapa,
+                        lat="lat",
+                        lon="lon",
+                        size="size",
+                        color="TDL Sum Tickets (B+S-A)",
+                        hover_name="Região Administrativa",
+                        hover_data={"TDL Sum Tickets (B+S-A)": True, "lat": False, "lon": False, "size": False},
+                        color_continuous_scale="YlOrRd",
+                        size_max=50,
+                        zoom=9.5,
+                        center={"lat": -22.9068, "lon": -43.1729},
+                        mapbox_style="open-street-map",
+                        labels={"TDL Sum Tickets (B+S-A)": "Ingressos"},
+                        title="Mapa de Ingressos por Região Administrativa"
+                    )
+                    
+                    fig_mapa_ra.update_layout(
+                        height=450,
+                        margin={"r":0,"t":40,"l":0,"b":0}
+                    )
+                    
+                    st.plotly_chart(fig_mapa_ra, use_container_width=True)
+                else:
+                    st.info("Dados de região administrativa não disponíveis para o mapa.")
+            
+            with col_bar_ra:
+                fig_ra = px.bar(
+                    por_ra,
+                    x="Região Administrativa",
+                    y="TDL Sum Tickets (B+S-A)",
+                    labels={
+                        "Região Administrativa": "Região Administrativa",
+                        "TDL Sum Tickets (B+S-A)": "Ingressos"
+                    },
+                    title="Ingressos por Região Administrativa",
+                    color="TDL Sum Tickets (B+S-A)",
+                    color_continuous_scale="Blues"
+                )
+                fig_ra.update_layout(height=450, showlegend=False)
+                st.plotly_chart(fig_ra, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                por_ra_display = por_ra.copy()
+                por_ra_display.columns = ["Região Administrativa", "Ingressos"]
+                st.dataframe(por_ra_display, hide_index=True, use_container_width=True)
 
         st.markdown("#### Mapa de Calor - Ingressos por Bairro")
         bairro_col = "WEB Customer Address Extension 3 - Bairro"
@@ -695,6 +1104,15 @@ def main():
                 )
                 
                 st.plotly_chart(fig_bairro_tipo, use_container_width=True)
+                
+                with st.expander("📊 Ver dados da tabela"):
+                    # Cria tabela pivotada para melhor visualização
+                    tabela_bairro_tipo = bairro_tipo_top.pivot(index=bairro_col, columns=tipo_ingresso_col, values="TDL Sum Tickets (B+S-A)").fillna(0)
+                    tabela_bairro_tipo = tabela_bairro_tipo.astype(int)
+                    # Adiciona total por bairro
+                    tabela_bairro_tipo['Total'] = tabela_bairro_tipo.sum(axis=1)
+                    tabela_bairro_tipo = tabela_bairro_tipo.sort_values('Total', ascending=False)
+                    st.dataframe(tabela_bairro_tipo, use_container_width=True)
             else:
                 st.info("Não há dados suficientes para exibir o gráfico de bairros por tipo de ingresso.")
 
@@ -751,10 +1169,17 @@ def main():
         # Filtros - Linha 2
         col4, col5, col6 = st.columns(3)
 
+        # Evento
+        if "EVENTO" in cred.columns:
+            eventos_cred = sorted([e for e in cred["EVENTO"].dropna().unique() if e != 'nan' and e != 'None'])
+            evento_cred_sel = col4.multiselect("Evento", eventos_cred, key="evento_cred")
+        else:
+            evento_cred_sel = []
+
         # Origem (2025 ou Desmontagem 2024)
         if "ORIGEM" in cred.columns:
             origens = sorted(cred["ORIGEM"].dropna().unique())
-            origem_sel = col4.multiselect("Ano/Evento", origens)
+            origem_sel = col5.multiselect("Ano/Evento", origens)
         else:
             origem_sel = []
 
@@ -762,9 +1187,26 @@ def main():
         if "dia_label" in cred.columns:
             dias_semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
             dias_disponiveis = [d for d in dias_semana if d in cred["dia_label"].unique()]
-            dia_semana_cred_sel = col5.multiselect("Dia da Semana", dias_disponiveis)
+            dia_semana_cred_sel = col6.multiselect("Dia da Semana", dias_disponiveis)
         else:
             dia_semana_cred_sel = []
+
+        # Filtros - Linha 3
+        col7, col8, col9 = st.columns(3)
+
+        # Período de data
+        if "DATA" in cred.columns and cred["DATA"].notna().any():
+            data_min_cred = cred["DATA"].min()
+            data_max_cred = cred["DATA"].max()
+            periodo_cred = col7.date_input(
+                "Período de credenciamento",
+                value=(data_min_cred, data_max_cred),
+                min_value=data_min_cred,
+                max_value=data_max_cred,
+                key="periodo_cred"
+            )
+        else:
+            periodo_cred = None
 
         # Aplica filtros
         df_c = cred.copy()
@@ -775,20 +1217,38 @@ def main():
             df_c = df_c[df_c["CATEGORIA"].isin(cat_sel)]
         if emp_sel and "EMPRESA" in df_c.columns:
             df_c = df_c[df_c["EMPRESA"].isin(emp_sel)]
+        if evento_cred_sel and "EVENTO" in df_c.columns:
+            df_c = df_c[df_c["EVENTO"].isin(evento_cred_sel)]
         if origem_sel and "ORIGEM" in df_c.columns:
             df_c = df_c[df_c["ORIGEM"].isin(origem_sel)]
         if dia_semana_cred_sel and "dia_label" in df_c.columns:
             df_c = df_c[df_c["dia_label"].isin(dia_semana_cred_sel)]
+        if periodo_cred is not None and isinstance(periodo_cred, (list, tuple)) and len(periodo_cred) == 2:
+            ini_cred, fim_cred = periodo_cred
+            df_c = df_c[
+                (df_c["DATA"] >= pd.to_datetime(ini_cred)) &
+                (df_c["DATA"] <= pd.to_datetime(fim_cred))
+            ]
 
         # Métricas gerais
         st.markdown("#### Visão geral")
         col_a, col_b, col_c = st.columns(3)
 
-        if "QTD" in df_c.columns:
+        # Conta profissionais únicos por CPF (evita duplicatas)
+        cpf_cols_cred = [col for col in df_c.columns if 'CPF' in col.upper()]
+        if cpf_cols_cred:
+            # Remove valores None/nan antes de contar
+            cpf_unicos = df_c[df_c[cpf_cols_cred[0]].notna() & (df_c[cpf_cols_cred[0]] != 'None')][cpf_cols_cred[0]].nunique()
+            col_a.metric("Profissionais únicos (CPF)", int(cpf_unicos))
+        elif "QTD" in df_c.columns:
             total_profissionais = df_c["QTD"].sum()
-            col_a.metric("Total de profissionais", int(total_profissionais))
+            col_a.metric("Total de registros", int(total_profissionais))
         
-        if "CATEGORIA" in df_c.columns:
+        # Total de credenciamentos (soma de QTD)
+        if "QTD" in df_c.columns:
+            total_credenciamentos = df_c["QTD"].sum()
+            col_b.metric("Total de credenciamentos", int(total_credenciamentos))
+        elif "CATEGORIA" in df_c.columns:
             total_categorias = df_c["CATEGORIA"].nunique()
             col_b.metric("Categorias únicas", int(total_categorias))
         
@@ -796,6 +1256,63 @@ def main():
             total_empresas = df_c["EMPRESA"].nunique()
             col_c.metric("Empresas envolvidas", int(total_empresas))
 
+        # Análise de profissionais por evento e dia
+        if "EVENTO" in df_c.columns and "DATA" in df_c.columns:
+            st.markdown("#### Profissionais por Evento e Dia")
+            
+            # Conta profissionais únicos por evento e data
+            cpf_col_cred = [col for col in df_c.columns if 'CPF' in col.upper()]
+            if cpf_col_cred:
+                prof_por_evento_dia = (
+                    df_c[df_c[cpf_col_cred[0]].notna() & (df_c[cpf_col_cred[0]] != 'None')]
+                    .groupby(["EVENTO", "DATA"])[cpf_col_cred[0]]
+                    .nunique()
+                    .reset_index()
+                )
+                prof_por_evento_dia.columns = ["Evento", "Data", "Profissionais Únicos"]
+                prof_por_evento_dia["Data"] = pd.to_datetime(prof_por_evento_dia["Data"]).dt.strftime("%d/%m/%Y")
+                
+                # Remove eventos None
+                prof_por_evento_dia = prof_por_evento_dia[prof_por_evento_dia["Evento"].notna()]
+                
+                if not prof_por_evento_dia.empty:
+                    # Cria tabela pivotada
+                    tabela_evento_dia = prof_por_evento_dia.pivot(
+                        index="Data",
+                        columns="Evento",
+                        values="Profissionais Únicos"
+                    ).fillna(0).astype(int)
+                    
+                    # Adiciona total por linha
+                    tabela_evento_dia['Total'] = tabela_evento_dia.sum(axis=1)
+                    
+                    st.dataframe(tabela_evento_dia, use_container_width=True)
+                    
+                    with st.expander("📊 Ver gráfico"):
+                        # Gráfico de barras empilhadas
+                        prof_por_evento_dia_num = prof_por_evento_dia.copy()
+                        prof_por_evento_dia_num["Data"] = pd.to_datetime(prof_por_evento_dia_num["Data"], format="%d/%m/%Y")
+                        
+                        fig_evento_dia = px.bar(
+                            prof_por_evento_dia_num,
+                            x="Data",
+                            y="Profissionais Únicos",
+                            color="Evento",
+                            barmode="stack",
+                            labels={
+                                "Data": "Data",
+                                "Profissionais Únicos": "Profissionais",
+                                "Evento": "Evento"
+                            },
+                            title="Profissionais únicos por evento e dia"
+                        )
+                        fig_evento_dia.update_layout(height=500)
+                        st.plotly_chart(fig_evento_dia, use_container_width=True)
+                else:
+                    st.info("Não há dados de eventos mapeados para o período selecionado.")
+            
+            st.markdown("---")
+        
         st.markdown("#### (a) Total de profissionais por categoria e etapa")
         if not df_c.empty and "CATEGORIA" in df_c.columns and "ETAPA" in df_c.columns and "QTD" in df_c.columns:
             total_cat_etapa = (
@@ -824,6 +1341,14 @@ def main():
             )
             
             st.plotly_chart(fig_total, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                # Cria tabela pivotada para melhor visualização
+                tabela_cat_etapa = total_cat_etapa.pivot(index="CATEGORIA", columns="ETAPA", values="QTD").fillna(0)
+                tabela_cat_etapa = tabela_cat_etapa.astype(int)
+                tabela_cat_etapa['Total'] = tabela_cat_etapa.sum(axis=1)
+                tabela_cat_etapa = tabela_cat_etapa.sort_values('Total', ascending=False)
+                st.dataframe(tabela_cat_etapa, use_container_width=True)
 
         st.markdown("#### (b) Média de profissionais por categoria em cada dia do evento")
         if not df_c.empty and "dia_label" in df_c.columns and "CATEGORIA" in df_c.columns and "QTD" in df_c.columns:
@@ -861,6 +1386,12 @@ def main():
                 
                 fig_media.update_layout(height=500)
                 st.plotly_chart(fig_media, use_container_width=True)
+                
+                with st.expander("📊 Ver dados da tabela"):
+                    # Cria tabela pivotada para melhor visualização
+                    tabela_media_dia = media_cat_dia.pivot(index="dia_label", columns="CATEGORIA", values="QTD").fillna(0)
+                    tabela_media_dia = tabela_media_dia.round(2)
+                    st.dataframe(tabela_media_dia, use_container_width=True)
             else:
                 st.info("Não há dados para os dias do evento (quarta a domingo).")
 
@@ -890,6 +1421,11 @@ def main():
                 title="Total de profissionais por dia da semana"
             )
             st.plotly_chart(fig_dia, use_container_width=True)
+            
+            with st.expander("📊 Ver dados da tabela"):
+                profissionais_por_dia_display = profissionais_por_dia.copy()
+                profissionais_por_dia_display.columns = ["Dia da Semana", "Total de Profissionais"]
+                st.dataframe(profissionais_por_dia_display, hide_index=True, use_container_width=True)
 
         st.markdown("#### Amostra dos dados de credenciamento")
         st.dataframe(df_c)
