@@ -148,22 +148,28 @@ def load_data():
         # Para artístico, usa NOME ou NOME COMPLETO como CPF se não houver CPF
         cpf_cols_artistico = [col for col in artistico_processado.columns if 'CPF' in col.upper()]
         if not cpf_cols_artistico:
-            # Se não tem coluna CPF, cria uma
+            # Se não tem coluna CPF, cria uma usando NOME COMPLETO ou NOME
             if "NOME COMPLETO" in artistico_processado.columns:
-                artistico_processado["CPF"] = artistico_processado["NOME COMPLETO"]
+                artistico_processado["FUNCIONÁRIOS - CPF"] = artistico_processado["NOME COMPLETO"]
             elif "NOME" in artistico_processado.columns:
-                artistico_processado["CPF"] = artistico_processado["NOME"]
+                artistico_processado["FUNCIONÁRIOS - CPF"] = artistico_processado["NOME"]
+            else:
+                # Se não tem nem nome, usa índice
+                artistico_processado["FUNCIONÁRIOS - CPF"] = "ARTISTICO_" + artistico_processado.index.astype(str)
         else:
-            # Se tem CPF mas está vazio, preenche com NOME COMPLETO ou NOME
+            # Se tem CPF mas está vazio, preenche com NOME COMPLETO, NOME ou índice
             cpf_col = cpf_cols_artistico[0]
+            # Primeiro tenta NOME COMPLETO
             if "NOME COMPLETO" in artistico_processado.columns:
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME COMPLETO"])
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].replace(['nan', 'None', 'NaN', ''], None)
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME COMPLETO"])
-            elif "NOME" in artistico_processado.columns:
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME"])
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].replace(['nan', 'None', 'NaN', ''], None)
-                artistico_processado[cpf_col] = artistico_processado[cpf_col].fillna(artistico_processado["NOME"])
+                mask_vazio = artistico_processado[cpf_col].isna() | (artistico_processado[cpf_col] == '') | (artistico_processado[cpf_col] == 'nan') | (artistico_processado[cpf_col] == 'None')
+                artistico_processado.loc[mask_vazio, cpf_col] = artistico_processado.loc[mask_vazio, "NOME COMPLETO"]
+            # Depois tenta NOME
+            if "NOME" in artistico_processado.columns:
+                mask_vazio = artistico_processado[cpf_col].isna() | (artistico_processado[cpf_col] == '') | (artistico_processado[cpf_col] == 'nan') | (artistico_processado[cpf_col] == 'None')
+                artistico_processado.loc[mask_vazio, cpf_col] = artistico_processado.loc[mask_vazio, "NOME"]
+            # Por último, usa índice como fallback
+            mask_vazio = artistico_processado[cpf_col].isna() | (artistico_processado[cpf_col] == '') | (artistico_processado[cpf_col] == 'nan') | (artistico_processado[cpf_col] == 'None')
+            artistico_processado.loc[mask_vazio, cpf_col] = "ARTISTICO_" + artistico_processado.loc[mask_vazio].index.astype(str)
     else:
         artistico_processado = pd.DataFrame()
     
@@ -175,22 +181,35 @@ def load_data():
     cred_2025["ORIGEM"] = "2025"
     desm_2024["ORIGEM"] = "Desmontagem 2024"
     
+    # Ajusta ETAPA para artístico (quando estiver vazia ou nan)
+    if "ETAPA" in cred_2025.columns:
+        cred_2025["ETAPA"] = cred_2025["ETAPA"].astype(str)
+        mask_etapa_vazia = cred_2025["ETAPA"].isin(['nan', 'None', 'NaN', '', '<NA>', 'nat'])
+        cred_2025.loc[mask_etapa_vazia, "ETAPA"] = "ARTÍSTICO"
+    
     # Processa dados de 2025
     if "DATA" in cred_2025.columns:
         cred_2025["DATA"] = pd.to_datetime(cred_2025["DATA"], errors="coerce")
     
-    # Converte todas as colunas object para string para evitar erros do PyArrow - 2025
-    for col in cred_2025.columns:
-        if cred_2025[col].dtype == 'object' and col != 'DATA':
-            cred_2025[col] = cred_2025[col].astype(str)
-    
-    # Tratamento especial para colunas de CPF - 2025
+    # Tratamento especial para colunas de CPF - 2025 (ANTES de converter para string)
     cpf_columns_2025 = [col for col in cred_2025.columns if 'CPF' in col.upper()]
     for col in cpf_columns_2025:
-        cred_2025[col] = cred_2025[col].replace(['nan', 'None', 'NaN', ''], None)
-        cred_2025[col] = cred_2025[col].apply(
-            lambda x: x.zfill(11) if x is not None and x not in ['nan', 'None', 'NaN', '', 'None'] else None
-        )
+        if col in cred_2025.columns:
+            # Converte para string
+            cred_2025[col] = cred_2025[col].astype(str)
+            
+            # Substitui valores vazios/nulos pelo índice
+            mask_vazio = cred_2025[col].isin(['nan', 'None', 'NaN', '', '<NA>', 'nat'])
+            cred_2025.loc[mask_vazio, col] = "SEM_CPF_" + cred_2025.loc[mask_vazio].index.astype(str)
+            
+            # Formata CPFs numéricos com zeros à esquerda
+            mask_numerico = cred_2025[col].str.isdigit() & (cred_2025[col].str.len() <= 11)
+            cred_2025.loc[mask_numerico, col] = cred_2025.loc[mask_numerico, col].str.zfill(11)
+    
+    # Converte todas as colunas object para string para evitar erros do PyArrow - 2025
+    for col in cred_2025.columns:
+        if cred_2025[col].dtype == 'object' and col != 'DATA' and col not in cpf_columns_2025:
+            cred_2025[col] = cred_2025[col].astype(str)
     
     # Adiciona informação de evento baseado na data - 2025
     if "TDL Event Date" in bilhetes_final.columns and "TDL Event" in bilhetes_final.columns:
@@ -559,7 +578,7 @@ def main():
     bilhetes, cred_2025, cred_2024 = load_data()
 
     # Aba de navegação
-    tab_bilhetagem, tab_credenciamento, tab_credenciamento_2024 = st.tabs(["🎟 Bilhetagem", "👷 Credenciamento 2025", "👷 Credenciamento 2024"])
+    tab_bilhetagem, tab_credenciamento = st.tabs(["🎟 Bilhetagem", "👷 Credenciamento 2025"])
 
     # ==============================
     # ABA 1 – BILHETAGEM
@@ -1357,219 +1376,139 @@ def main():
             total_empresas = df_c["EMPRESA"].nunique()
             col_c.metric("Empresas envolvidas", int(total_empresas))
 
-        # Análise de profissionais por evento e dia
-        if "EVENTO" in df_c.columns and "DATA" in df_c.columns:
-            st.markdown("#### Profissionais por Evento e Dia")
+        # Análise de profissionais por categoria e dia
+        if "CATEGORIA" in df_c.columns and "DATA" in df_c.columns:
+            st.markdown("#### Profissionais por Categoria e Dia")
             
-            # Conta profissionais únicos por evento e data
+            # Conta profissionais por categoria e data
             cpf_col_cred = [col for col in df_c.columns if 'CPF' in col.upper()]
             if cpf_col_cred:
-                prof_por_evento_dia = (
-                    df_c[df_c[cpf_col_cred[0]].notna() & (df_c[cpf_col_cred[0]] != 'None')]
-                    .groupby(["EVENTO", "DATA"])[cpf_col_cred[0]]
-                    .nunique()
+                # Filtra categorias válidas
+                df_c_cat_dia = df_c[
+                    df_c["CATEGORIA"].notna() & 
+                    (df_c["CATEGORIA"] != 'nan') & 
+                    (df_c["CATEGORIA"] != 'None')
+                ]
+                
+                prof_por_cat_dia = (
+                    df_c_cat_dia.groupby(["CATEGORIA", "DATA"])[cpf_col_cred[0]]
+                    .count()
                     .reset_index()
                 )
-                prof_por_evento_dia.columns = ["Evento", "Data", "Profissionais Únicos"]
-                prof_por_evento_dia["Data"] = pd.to_datetime(prof_por_evento_dia["Data"]).dt.strftime("%d/%m/%Y")
+                prof_por_cat_dia.columns = ["Categoria", "Data", "Profissionais"]
+                prof_por_cat_dia["Data"] = pd.to_datetime(prof_por_cat_dia["Data"]).dt.strftime("%d/%m/%Y")
                 
-                # Remove eventos None
-                prof_por_evento_dia = prof_por_evento_dia[prof_por_evento_dia["Evento"].notna()]
-                
-                if not prof_por_evento_dia.empty:
+                if not prof_por_cat_dia.empty:
                     # Cria tabela pivotada
-                    tabela_evento_dia = prof_por_evento_dia.pivot(
+                    tabela_cat_dia = prof_por_cat_dia.pivot(
                         index="Data",
-                        columns="Evento",
-                        values="Profissionais Únicos"
+                        columns="Categoria",
+                        values="Profissionais"
                     ).fillna(0).astype(int)
                     
                     # Adiciona total por linha
-                    tabela_evento_dia['Total'] = tabela_evento_dia.sum(axis=1)
+                    tabela_cat_dia['Total'] = tabela_cat_dia.sum(axis=1)
                     
-                    st.dataframe(tabela_evento_dia, use_container_width=True)
+                    st.dataframe(tabela_cat_dia, use_container_width=True)
                     
                     with st.expander("📊 Ver gráfico"):
                         # Gráfico de barras empilhadas
-                        prof_por_evento_dia_num = prof_por_evento_dia.copy()
-                        prof_por_evento_dia_num["Data"] = pd.to_datetime(prof_por_evento_dia_num["Data"], format="%d/%m/%Y")
+                        prof_por_cat_dia_num = prof_por_cat_dia.copy()
+                        prof_por_cat_dia_num["Data"] = pd.to_datetime(prof_por_cat_dia_num["Data"], format="%d/%m/%Y")
                         
                         # Calcula total por dia para mostrar no topo
-                        total_por_dia_evento = prof_por_evento_dia_num.groupby("Data")["Profissionais Únicos"].sum().reset_index()
-                        total_por_dia_evento.columns = ["Data", "Total"]
+                        total_por_dia_cat = prof_por_cat_dia_num.groupby("Data")["Profissionais"].sum().reset_index()
+                        total_por_dia_cat.columns = ["Data", "Total"]
                         
-                        fig_evento_dia = px.bar(
-                            prof_por_evento_dia_num,
+                        fig_cat_dia = px.bar(
+                            prof_por_cat_dia_num,
                             x="Data",
-                            y="Profissionais Únicos",
-                            color="Evento",
+                            y="Profissionais",
+                            color="Categoria",
                             barmode="stack",
                             labels={
                                 "Data": "Data",
-                                "Profissionais Únicos": "Profissionais",
-                                "Evento": "Evento"
+                                "Profissionais": "Profissionais",
+                                "Categoria": "Categoria"
                             },
-                            title="Profissionais únicos por evento e dia"
+                            title="Profissionais por categoria e dia"
                         )
                         
                         # Adiciona anotações com o total no topo de cada barra
-                        for _, row in total_por_dia_evento.iterrows():
-                            fig_evento_dia.add_annotation(
+                        for _, row in total_por_dia_cat.iterrows():
+                            fig_cat_dia.add_annotation(
                                 x=row["Data"],
                                 y=row["Total"],
                                 text=f"{row['Total']:.0f}",
                                 showarrow=False,
                                 yshift=10,
-                                font=dict(size=12, color="black")
+                                font=dict(size=12, color="white", family="Arial Black"),
+                                bgcolor="rgba(0,0,0,0.7)",
+                                bordercolor="white",
+                                borderwidth=1,
+                                borderpad=3
                             )
                         
-                        fig_evento_dia.update_layout(height=500)
-                        st.plotly_chart(fig_evento_dia, use_container_width=True)
+                        fig_cat_dia.update_layout(height=500)
+                        st.plotly_chart(fig_cat_dia, use_container_width=True)
                 else:
-                    st.info("Não há dados de eventos mapeados para o período selecionado.")
+                    st.info("Não há dados de categorias mapeadas para o período selecionado.")
             
             st.markdown("---")
         
-        st.markdown("#### (a) Total de profissionais por categoria e etapa")
-        if not df_c.empty and "CATEGORIA" in df_c.columns and "ETAPA" in df_c.columns and cpf_cols_cred:
-            total_cat_etapa = (
-                df_c.groupby(["CATEGORIA", "ETAPA"])[cpf_cols_cred[0]]
+        st.markdown("#### (a) Total de profissionais por categoria")
+        if not df_c.empty and "CATEGORIA" in df_c.columns and cpf_cols_cred:
+            # Filtra NaN antes de agrupar
+            df_c_cat = df_c[df_c["CATEGORIA"].notna() & (df_c["CATEGORIA"] != 'nan') & (df_c["CATEGORIA"] != 'None')]
+            total_cat = (
+                df_c_cat.groupby("CATEGORIA")[cpf_cols_cred[0]]
                 .count()
                 .reset_index()
             )
-            total_cat_etapa.columns = ["CATEGORIA", "ETAPA", "Total"]
-            total_cat_etapa = total_cat_etapa[total_cat_etapa["CATEGORIA"].notna() & total_cat_etapa["ETAPA"].notna()]
+            total_cat.columns = ["CATEGORIA", "Total"]
+            total_cat = total_cat[total_cat["CATEGORIA"].notna()]
+            total_cat = total_cat.sort_values("Total", ascending=False)
 
-            # Calcula percentuais por categoria
-            total_por_categoria = total_cat_etapa.groupby("CATEGORIA")["Total"].transform('sum')
-            total_cat_etapa["Percentual"] = (total_cat_etapa["Total"] / total_por_categoria * 100).round(1)
+            # Calcula percentuais
+            total_geral = total_cat["Total"].sum()
+            total_cat["Percentual"] = (total_cat["Total"] / total_geral * 100).round(1)
             
             fig_total = px.bar(
-                total_cat_etapa,
+                total_cat,
                 x="CATEGORIA",
                 y="Total",
-                color="ETAPA",
-                barmode="stack",
                 labels={
                     "CATEGORIA": "Categoria",
-                    "Total": "Total de profissionais",
-                    "ETAPA": "Etapa"
+                    "Total": "Total de profissionais"
                 },
-                title="Total de profissionais por categoria e etapa (empilhado)",
-                text=total_cat_etapa["Percentual"].apply(lambda x: f"{x}%")
+                title="Total de profissionais por categoria",
+                text=total_cat["Percentual"].apply(lambda x: f"{x}%"),
+                color="Total",
+                color_continuous_scale="Blues"
             )
             
-            fig_total.update_traces(textposition='inside', textfont_size=10)
+            fig_total.update_traces(textposition='outside')
             fig_total.update_layout(
                 xaxis={'categoryorder':'total descending'},
-                height=500
+                height=500,
+                showlegend=False
             )
             
             st.plotly_chart(fig_total, use_container_width=True)
             
             with st.expander("📊 Ver dados da tabela"):
-                # Cria tabela pivotada para melhor visualização
-                tabela_cat_etapa = total_cat_etapa.pivot(index="CATEGORIA", columns="ETAPA", values="Total").fillna(0)
-                tabela_cat_etapa = tabela_cat_etapa.astype(int)
-                tabela_cat_etapa['Total'] = tabela_cat_etapa.sum(axis=1)
-                tabela_cat_etapa = tabela_cat_etapa.sort_values('Total', ascending=False)
-                st.dataframe(tabela_cat_etapa, use_container_width=True)
-
-        st.markdown("#### Pirâmide de Categorias de Credenciamento")
-        if not df_c.empty and "CATEGORIA" in df_c.columns and cpf_cols_cred:
-            # Agrupa por categoria
-            cat_totais = (
-                df_c.groupby("CATEGORIA")[cpf_cols_cred[0]]
-                .count()
-                .reset_index()
-            )
-            cat_totais.columns = ["CATEGORIA", "Total"]
-            cat_totais = cat_totais[cat_totais["CATEGORIA"].notna()]
-            cat_totais = cat_totais.sort_values("Total", ascending=False)
-            
-            # Calcula percentuais
-            total_cat = cat_totais["Total"].sum()
-            cat_totais["Percentual"] = (cat_totais["Total"] / total_cat * 100).round(1)
-            
-            # Cria pirâmide simétrica (divide valores ao meio para criar formato triangular)
-            cat_totais_sorted = cat_totais.sort_values("Total", ascending=False)
-            
-            # Cria valores negativos e positivos para simular pirâmide
-            valores_esquerda = -cat_totais_sorted["Total"] / 2
-            valores_direita = cat_totais_sorted["Total"] / 2
-            
-            fig_piramide = go.Figure()
-            
-            # Lado esquerdo da pirâmide
-            fig_piramide.add_trace(go.Bar(
-                y=cat_totais_sorted["CATEGORIA"],
-                x=valores_esquerda,
-                orientation='h',
-                name='',
-                marker=dict(
-                    color=cat_totais_sorted["Total"],
-                    colorscale='Viridis',
-                    showscale=False
-                ),
-                text='',
-                hovertemplate='<b>%{y}</b><br>Profissionais: %{customdata}<br><extra></extra>',
-                customdata=cat_totais_sorted["Total"],
-                showlegend=False
-            ))
-            
-            # Lado direito da pirâmide
-            fig_piramide.add_trace(go.Bar(
-                y=cat_totais_sorted["CATEGORIA"],
-                x=valores_direita,
-                orientation='h',
-                name='',
-                marker=dict(
-                    color=cat_totais_sorted["Total"],
-                    colorscale='Viridis',
-                    showscale=True,
-                    colorbar=dict(title="Profissionais")
-                ),
-                text=[f"{q} ({p}%)" for q, p in zip(cat_totais_sorted["Total"], cat_totais_sorted["Percentual"])],
-                textposition='outside',
-                hovertemplate='<b>%{y}</b><br>Profissionais: %{customdata}<br><extra></extra>',
-                customdata=cat_totais_sorted["Total"],
-                showlegend=False
-            ))
-            
-            # Configura layout da pirâmide
-            max_val = cat_totais_sorted["Total"].max() / 2
-            fig_piramide.update_layout(
-                title="Distribuição de Profissionais por Categoria (Pirâmide)",
-                xaxis=dict(
-                    title="",
-                    range=[-max_val * 1.3, max_val * 1.3],
-                    showticklabels=False,
-                    showgrid=False,
-                    zeroline=False
-                ),
-                yaxis=dict(
-                    title="Categoria",
-                    categoryorder='total descending'
-                ),
-                height=max(400, len(cat_totais) * 35),
-                barmode='overlay',
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                showlegend=False
-            )
-            
-            st.plotly_chart(fig_piramide, use_container_width=True)
-            
-            with st.expander("📊 Ver dados da tabela"):
-                cat_display = cat_totais.copy()
-                cat_display.columns = ["Categoria", "Total de Profissionais", "Percentual (%)"]
-                st.dataframe(cat_display, hide_index=True, use_container_width=True)
+                total_cat_display = total_cat.copy()
+                total_cat_display.columns = ["Categoria", "Total de Profissionais", "Percentual (%)"]
+                st.dataframe(total_cat_display, hide_index=True, use_container_width=True)
 
         st.markdown("#### Número de Fornecedores por Categoria")
         if not df_c.empty and "CATEGORIA" in df_c.columns and "EMPRESA" in df_c.columns:
+            # Filtra NaN antes de agrupar
+            df_c_forn = df_c[df_c["CATEGORIA"].notna() & (df_c["CATEGORIA"] != 'nan') & (df_c["CATEGORIA"] != 'None') & 
+                             df_c["EMPRESA"].notna() & (df_c["EMPRESA"] != 'nan') & (df_c["EMPRESA"] != 'None')]
             # Conta fornecedores únicos por categoria
             fornecedores_por_cat = (
-                df_c.groupby("CATEGORIA")["EMPRESA"]
+                df_c_forn.groupby("CATEGORIA")["EMPRESA"]
                 .nunique()
                 .reset_index()
                 .sort_values("EMPRESA", ascending=False)
@@ -1609,9 +1548,14 @@ def main():
 
         st.markdown("#### (b) Total de profissionais por categoria em cada dia do evento")
         if not df_c.empty and "dia_label" in df_c.columns and "CATEGORIA" in df_c.columns and cpf_cols_cred:
-            # Filtra apenas os dias do evento (qua a dom)
+            # Filtra apenas os dias do evento (qua a dom) e remove NaN
             dias_evento = ["Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-            df_c_evento = df_c[df_c["dia_label"].isin(dias_evento)]
+            df_c_evento = df_c[
+                df_c["dia_label"].isin(dias_evento) & 
+                df_c["CATEGORIA"].notna() & 
+                (df_c["CATEGORIA"] != 'nan') & 
+                (df_c["CATEGORIA"] != 'None')
+            ]
             
             if not df_c_evento.empty:
                 total_cat_dia = (
@@ -1671,8 +1615,10 @@ def main():
 
         st.markdown("#### Distribuição por dia da semana")
         if not df_c.empty and "dia_label" in df_c.columns and cpf_cols_cred:
+            # Filtra NaN antes de agrupar
+            df_c_dia = df_c[df_c["dia_label"].notna() & (df_c["dia_label"] != 'nan') & (df_c["dia_label"] != 'None')]
             profissionais_por_dia = (
-                df_c.groupby("dia_label")[cpf_cols_cred[0]]
+                df_c_dia.groupby("dia_label")[cpf_cols_cred[0]]
                 .count()
                 .reset_index()
             )
@@ -1710,147 +1656,26 @@ def main():
                 st.dataframe(profissionais_por_dia_display, hide_index=True, use_container_width=True)
 
         st.markdown("#### Amostra dos dados de credenciamento")
-        st.dataframe(df_c)
-
-    # ==============================
-    # ABA 3 – CREDENCIAMENTO 2024
-    # ==============================
-    with tab_credenciamento_2024:
-        st.subheader("👷 Análises de Credenciamento 2024 (Desmontagem)")
-
-        cred_24 = cred_2024.copy()
-
-        # Cria coluna com dia da semana
-        if "DATA" in cred_24.columns:
-            cred_24["dia_semana"] = cred_24["DATA"].dt.day_name()
-
-            # Traduz e ordena
-            mapa_dia_24 = {
-                "Wednesday": "Quarta",
-                "Thursday": "Quinta",
-                "Friday": "Sexta",
-                "Saturday": "Sábado",
-                "Sunday": "Domingo",
-                "Monday": "Segunda",
-                "Tuesday": "Terça",
-            }
-            cred_24["dia_label"] = cred_24["dia_semana"].map(mapa_dia_24)
-
-        # Métricas gerais
-        st.markdown("#### Visão geral")
-        col_a, col_b, col_c = st.columns(3)
-
-        # Conta profissionais únicos por CPF
-        cpf_cols_cred_24 = [col for col in cred_24.columns if 'CPF' in col.upper()]
-        if cpf_cols_cred_24:
-            cpf_unicos_24 = cred_24[cred_24[cpf_cols_cred_24[0]].notna() & (cred_24[cpf_cols_cred_24[0]] != 'None')][cpf_cols_cred_24[0]].nunique()
-            col_a.metric("Profissionais únicos (CPF)", int(cpf_unicos_24))
-        else:
-            total_registros_24 = len(cred_24)
-            col_a.metric("Total de registros", int(total_registros_24))
         
-        # Total de credenciamentos
-        total_credenciamentos_24 = len(cred_24)
-        col_b.metric("Total de credenciamentos", int(total_credenciamentos_24))
+        # Seleciona as colunas principais para exibição
+        colunas_exibir = []
+        colunas_possiveis = ["DATA", "NOME", "CATEGORIA", "EMPRESA", "ETAPA", "EVENTO", "ORIGEM"]
         
-        if "EMPRESA" in cred_24.columns:
-            total_empresas_24 = cred_24["EMPRESA"].nunique()
-            col_c.metric("Empresas envolvidas", int(total_empresas_24))
-
-        st.markdown("---")
-        st.markdown("### 📊 Projeção para Desmontagem 2025")
+        for col in colunas_possiveis:
+            if col in df_c.columns:
+                colunas_exibir.append(col)
         
-        # Verifica se os dados 2024 possuem EMPRESA (para agrupar)
-        if not cred_24.empty and "EMPRESA" in cred_24.columns:
-            # Conta profissionais por empresa
-            prof_por_empresa_24 = (
-                cred_24.groupby("EMPRESA")
-                .size()
-                .reset_index(name="Profissionais")
-                .sort_values("Profissionais", ascending=False)
-            )
-            prof_por_empresa_24 = prof_por_empresa_24[prof_por_empresa_24["EMPRESA"].notna()]
-            prof_por_empresa_24.columns = ["Empresa", "Profissionais 2024"]
-            
-            col_proj1, col_proj2 = st.columns(2)
-            
-            with col_proj1:
-                st.markdown("#### Profissionais por Empresa (2024)")
-                
-                fig_cat_24 = px.bar(
-                    prof_por_empresa_24,
-                    x="Empresa",
-                    y="Profissionais 2024",
-                    title="Distribuição por empresa em 2024",
-                    color="Profissionais 2024",
-                    color_continuous_scale="Reds"
-                )
-                fig_cat_24.update_layout(
-                    xaxis={'categoryorder':'total descending'},
-                    height=400,
-                    showlegend=False
-                )
-                st.plotly_chart(fig_cat_24, use_container_width=True)
-            
-            with col_proj2:
-                st.markdown("#### Projeção para 2025")
-                
-                # Slider para fator de crescimento
-                fator_crescimento = st.slider(
-                    "Fator de crescimento/redução (%)",
-                    min_value=-50,
-                    max_value=100,
-                    value=10,
-                    step=5,
-                    help="Ajuste o percentual de crescimento ou redução esperado para 2025"
-                )
-                
-                # Calcula projeção
-                prof_por_empresa_24_proj = prof_por_empresa_24.copy()
-                prof_por_empresa_24_proj["Projeção 2025"] = (
-                    prof_por_empresa_24_proj["Profissionais 2024"] * (1 + fator_crescimento / 100)
-                ).round(0).astype(int)
-                
-                fig_proj = px.bar(
-                    prof_por_empresa_24_proj,
-                    x="Empresa",
-                    y="Projeção 2025",
-                    title=f"Projeção para 2025 ({fator_crescimento:+d}%)",
-                    color="Projeção 2025",
-                    color_continuous_scale="Greens"
-                )
-                fig_proj.update_layout(
-                    xaxis={'categoryorder':'total descending'},
-                    height=400,
-                    showlegend=False
-                )
-                st.plotly_chart(fig_proj, use_container_width=True)
-            
-            # Resumo da projeção
-            st.markdown("#### 📋 Resumo da Projeção")
-            
-            total_2024 = prof_por_empresa_24["Profissionais 2024"].sum()
-            total_2025_proj = (total_2024 * (1 + fator_crescimento / 100)).round(0)
-            diferenca = total_2025_proj - total_2024
-            
-            col_res1, col_res2, col_res3 = st.columns(3)
-            col_res1.metric("Total 2024", f"{int(total_2024):,}")
-            col_res2.metric("Projeção 2025", f"{int(total_2025_proj):,}", f"{int(diferenca):+,}")
-            col_res3.metric("Variação", f"{fator_crescimento:+d}%")
-            
-            # Tabela detalhada
-            with st.expander("📊 Ver projeção detalhada por empresa"):
-                tabela_projecao = prof_por_empresa_24_proj.copy()
-                tabela_projecao["Diferença"] = tabela_projecao["Projeção 2025"] - tabela_projecao["Profissionais 2024"]
-                tabela_projecao["Variação %"] = fator_crescimento
-                st.dataframe(tabela_projecao, hide_index=True, use_container_width=True)
-        else:
-            st.info("Dados insuficientes para gerar projeção.")
-
-        st.markdown("---")
-        st.markdown("#### Amostra dos dados de credenciamento 2024")
-        st.dataframe(cred_24)
-
+        # Adiciona coluna CPF se existir
+        if cpf_cols_cred:
+            colunas_exibir.insert(1, cpf_cols_cred[0])
+        
+        # Remove valores 'nan', 'None' das colunas string para melhor visualização
+        df_c_display = df_c[colunas_exibir].copy()
+        for col in df_c_display.columns:
+            if df_c_display[col].dtype == 'object':
+                df_c_display[col] = df_c_display[col].replace(['nan', 'None'], '')
+        
+        st.dataframe(df_c_display, use_container_width=True)
 
 if __name__ == "__main__":
     main()
