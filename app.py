@@ -557,6 +557,68 @@ def main():
         # Gráfico de bairros por tipo de ingresso (função modular)
         grafico_bairros_por_tipo_ingresso(df_b)
 
+        # Top 10 Bairros
+        st.markdown("#### Top 10 Bairros por Total de Ingressos")
+        if "bairro_google_norm" in df_b.columns:
+            top_bairros = (
+                df_b[df_b["bairro_google_norm"].notna()]
+                .groupby("bairro_google_norm")["TDL Sum Tickets (B+S-A)"]
+                .sum()
+                .reset_index()
+                .sort_values("TDL Sum Tickets (B+S-A)", ascending=False)
+                .head(10)
+            )
+            
+            # Calcula percentuais em relação ao total geral
+            total_geral_ingressos = df_b["TDL Sum Tickets (B+S-A)"].sum()
+            top_bairros["Percentual"] = (top_bairros["TDL Sum Tickets (B+S-A)"] / total_geral_ingressos * 100).round(1)
+            
+            # Layout com gráfico e tabela lado a lado
+            col_grafico, col_tabela = st.columns([2, 1])
+            
+            with col_grafico:
+                fig_top_bairros = px.bar(
+                    top_bairros,
+                    x="bairro_google_norm",
+                    y="TDL Sum Tickets (B+S-A)",
+                    labels={
+                        "bairro_google_norm": "Bairro",
+                        "TDL Sum Tickets (B+S-A)": "Total de Ingressos"
+                    },
+                    title="Top 10 Bairros",
+                    text=top_bairros["Percentual"].apply(lambda x: f"{x}%"),
+                    color="TDL Sum Tickets (B+S-A)",
+                    color_continuous_scale="Blues"
+                )
+                fig_top_bairros.update_traces(textposition='outside')
+                fig_top_bairros.update_layout(
+                    xaxis={'categoryorder':'total descending'},
+                    height=500,
+                    showlegend=False
+                )
+                st.plotly_chart(fig_top_bairros, use_container_width=True)
+            
+            with col_tabela:
+                # Formata para exibição
+                top_bairros_display = top_bairros.copy()
+                top_bairros_display.columns = ["Bairro", "Total de Ingressos", "Percentual (%)"]
+                top_bairros_display["Total de Ingressos"] = top_bairros_display["Total de Ingressos"].astype(int)
+                top_bairros_display.index = range(1, len(top_bairros_display) + 1)
+                
+                st.dataframe(top_bairros_display, use_container_width=True, height=500)
+            
+            # Botão de download
+            csv_top_bairros = top_bairros_display.to_csv(index=True, encoding='utf-8-sig')
+            st.download_button(
+                label="📥 Download Top 10 Bairros (CSV)",
+                data=csv_top_bairros,
+                file_name="top_10_bairros.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.info("Coluna de bairro não disponível nos dados.")
+
         # Tabela
         st.markdown("#### Amostra dos dados de bilhetagem")
         st.dataframe(df_b)
@@ -677,17 +739,16 @@ def main():
         st.markdown("#### Visão geral")
         col_a, col_b, col_c = st.columns(3)
 
-        # Conta profissionais únicos por CPF (evita duplicatas)
+        # Total de credenciamentos (total de registros)
         cpf_cols_cred = [col for col in df_c.columns if 'CPF' in col.upper()]
+        total_credenciamentos = len(df_c)
+        col_a.metric("Total de credenciamentos", int(total_credenciamentos))
+        
+        # Conta profissionais únicos por CPF
         if cpf_cols_cred:
             # Remove valores None/nan antes de contar
             cpf_unicos = df_c[df_c[cpf_cols_cred[0]].notna() & (df_c[cpf_cols_cred[0]] != 'None')][cpf_cols_cred[0]].nunique()
-            col_a.metric("Profissionais únicos (CPF)", int(cpf_unicos))
-        
-        # Total de credenciamentos (count de CPF)
-        if cpf_cols_cred:
-            total_credenciamentos = len(df_c)
-            col_b.metric("Total de credenciamentos", int(total_credenciamentos))
+            col_b.metric("Profissionais únicos (CPF)", int(cpf_unicos))
         elif "CATEGORIA" in df_c.columns:
             total_categorias = df_c["CATEGORIA"].nunique()
             col_b.metric("Categorias únicas", int(total_categorias))

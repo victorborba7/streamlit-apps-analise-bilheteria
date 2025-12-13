@@ -390,7 +390,7 @@ def mapa_ras_capital(df_b, carregar_geojson_ras_func):
 def grafico_bairros_por_tipo_ingresso(df_b):
     """Exibe gráfico de bairros por tipo de ingresso"""
     st.markdown("#### Bairros por Tipo de Ingresso")
-    bairro_col = "bairro_norm_google"
+    bairro_col = "bairro_google_norm"
     tipo_ingresso_col = "TDL Price Category"
     
     if not df_b.empty and bairro_col in df_b.columns and tipo_ingresso_col in df_b.columns:
