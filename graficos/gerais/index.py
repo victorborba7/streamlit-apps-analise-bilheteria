@@ -18,6 +18,17 @@ def get_plotly_config(escala=2):
     }
 
 
+def get_font_sizes(escala=2):
+    """Retorna tamanhos de fonte base aumentados"""
+    return {
+        'title': 24,
+        'axis': 18,
+        'tick': 16,
+        'legend': 16,
+        'annotation': 14
+    }
+
+
 def grafico_vendas_ao_longo_do_tempo(df_b, escala=2):
     """Exibe gráfico de linha mostrando ingressos vendidos ao longo do tempo"""
     st.markdown("#### Ingressos ao longo do tempo")
@@ -37,6 +48,14 @@ def grafico_vendas_ao_longo_do_tempo(df_b, escala=2):
                 "TDL Sum Tickets (B+S-A)": "Ingressos"
             },
             title="Ingressos vendidos por dia"
+        )
+        fonts = get_font_sizes(escala)
+        fig_tempo.update_layout(
+            title_font_size=fonts['title'],
+            xaxis_title_font_size=fonts['axis'],
+            yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick']
         )
         st.plotly_chart(fig_tempo, use_container_width=True, config=get_plotly_config(escala))
         
@@ -85,7 +104,15 @@ def analise_comportamento_compra(df_b, escala=2):
                 title="Quantos ingressos cada cliente comprou?",
                 text=dist_faixa["Percentual"].apply(lambda x: f"{x}%")
             )
-            fig_dist.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_dist.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+            fig_dist.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
+            )
             st.plotly_chart(fig_dist, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
@@ -177,6 +204,12 @@ def analise_comportamento_compra(df_b, escala=2):
             names="Eventos",
             title="Distribuição de clientes por número de eventos diferentes frequentados",
             hole=0.4
+        )
+        fonts = get_font_sizes(escala)
+        fig_recorrencia.update_layout(
+            title_font_size=fonts['title'],
+            legend_font_size=fonts['legend'],
+            font_size=fonts['annotation']
         )
         st.plotly_chart(fig_recorrencia, use_container_width=True, config=get_plotly_config(escala))
         

@@ -18,6 +18,17 @@ def get_plotly_config(escala=2):
     }
 
 
+def get_font_sizes(escala=2):
+    """Retorna tamanhos de fonte base aumentados"""
+    return {
+        'title': 24,
+        'axis': 18,
+        'tick': 16,
+        'legend': 16,
+        'annotation': 14
+    }
+
+
 def analise_demografica(df_b, escala=2):
     """Exibe análises demográficas dos clientes"""
     st.markdown("### 👥 Perfil Demográfico dos Clientes")
@@ -52,6 +63,12 @@ def analise_demografica(df_b, escala=2):
                 title="Ingressos por Gênero",
                 hole=0.4
             )
+            fonts = get_font_sizes(escala)
+            fig_genero.update_layout(
+                title_font_size=fonts['title'],
+                legend_font_size=fonts['legend'],
+                font_size=fonts['annotation']
+            )
             st.plotly_chart(fig_genero, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
@@ -78,7 +95,15 @@ def analise_demografica(df_b, escala=2):
                 title="Ingressos por Faixa Etária",
                 text=idade_count["Percentual"].apply(lambda x: f"{x}%")
             )
-            fig_idade.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_idade.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+            fig_idade.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
+            )
             st.plotly_chart(fig_idade, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
@@ -130,7 +155,16 @@ def analise_demografica(df_b, escala=2):
             title="Distribuição de ingressos por gênero e faixa etária",
             text=cruzamento["Percentual"].apply(lambda x: f"{x}%")
         )
-        fig_cruzamento.update_traces(textposition='outside')
+        fonts = get_font_sizes(escala)
+        fig_cruzamento.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+        fig_cruzamento.update_layout(
+            title_font_size=fonts['title'],
+            xaxis_title_font_size=fonts['axis'],
+            yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend']
+        )
         st.plotly_chart(fig_cruzamento, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):

@@ -23,6 +23,17 @@ def get_plotly_config(escala=2):
     }
 
 
+def get_font_sizes(escala=2):
+    """Retorna tamanhos de fonte base aumentados"""
+    return {
+        'title': 24,
+        'axis': 18,
+        'tick': 16,
+        'legend': 16,
+        'annotation': 14
+    }
+
+
 def remover_acentos(texto):
     """Remove acentos de uma string"""
     if pd.isna(texto):
@@ -137,9 +148,12 @@ def mapa_brasil(df_b, carregar_geojson_brasil_func, escala=2):
                         title="Distribuição de ingressos vendidos por estado (escala normalizada)"
                     )
                     
+                    fonts = get_font_sizes(escala)
                     fig_brasil.update_layout(
                         height=600,
-                        margin={"r":0,"t":40,"l":0,"b":0}
+                        margin={"r":0,"t":40,"l":0,"b":0},
+                        title_font_size=fonts['title'],
+                        font_size=fonts['tick']
                     )
                     
                     st.plotly_chart(fig_brasil, use_container_width=True, config=get_plotly_config(escala))
@@ -180,7 +194,15 @@ def mapa_brasil(df_b, carregar_geojson_brasil_func, escala=2):
                 color="Ingressos",
                 color_continuous_scale="Blues"
             )
-            fig_pais.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_pais.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+            fig_pais.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
+            )
             st.plotly_chart(fig_pais, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver todos os países"):
@@ -267,9 +289,12 @@ def mapa_estado_rj(df_b, carregar_geojson_municipios_rj_func, escala=2):
                             title="Distribuição de ingressos por município no Estado do Rio de Janeiro"
                         )
                         
+                        fonts = get_font_sizes(escala)
                         fig_rj.update_layout(
                             height=600,
-                            margin={"r":0,"t":40,"l":0,"b":0}
+                            margin={"r":0,"t":40,"l":0,"b":0},
+                            title_font_size=fonts['title'],
+                            font_size=fonts['tick']
                         )
                         
                         st.plotly_chart(fig_rj, use_container_width=True, config=get_plotly_config(escala))
@@ -376,9 +401,12 @@ def mapa_ras_capital(df_b, carregar_geojson_ras_func, escala=2):
                         title="Distribuição de ingressos por Região Administrativa (escala normalizada)"
                     )
                     
+                    fonts = get_font_sizes(escala)
                     fig_mapa_ra_oficial.update_layout(
                         height=600,
-                        margin={"r":0,"t":40,"l":0,"b":0}
+                        margin={"r":0,"t":40,"l":0,"b":0},
+                        title_font_size=fonts['title'],
+                        font_size=fonts['tick']
                     )
                     
                     st.plotly_chart(fig_mapa_ra_oficial, use_container_width=True, config=get_plotly_config(escala))
@@ -448,10 +476,17 @@ def grafico_bairros_por_tipo_ingresso(df_b, escala=2):
                 text=bairro_tipo_top["Percentual"].apply(lambda x: f"{x}%")
             )
             
-            fig_bairro_tipo.update_traces(textposition='inside', textfont_size=10)
+            fonts = get_font_sizes(escala)
+            fig_bairro_tipo.update_traces(textposition='inside', textfont_size=fonts['annotation'])
             fig_bairro_tipo.update_layout(
                 xaxis={'categoryorder':'total descending'},
-                height=500
+                height=500,
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick'],
+                legend_font_size=fonts['legend']
             )
             
             st.plotly_chart(fig_bairro_tipo, use_container_width=True, config=get_plotly_config(escala))

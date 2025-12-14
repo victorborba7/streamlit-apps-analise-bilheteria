@@ -42,6 +42,17 @@ def get_plotly_config(escala=2):
     }
 
 
+def get_font_sizes(escala=2):
+    """Retorna tamanhos de fonte base aumentados"""
+    return {
+        'title': 24,
+        'axis': 18,
+        'tick': 16,
+        'legend': 16,
+        'annotation': 14
+    }
+
+
 # ==============================
 # Carregamento dos dados
 # ==============================
@@ -603,8 +614,17 @@ def main():
                 color_continuous_scale="Blues",
                 text=por_ra["Percentual"].apply(lambda x: f"{x}%")
             )
-            fig_ra.update_traces(textposition='outside')
-            fig_ra.update_layout(height=450, showlegend=False)
+            fonts = get_font_sizes(escala)
+            fig_ra.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+            fig_ra.update_layout(
+                height=450,
+                showlegend=False,
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
+            )
             st.plotly_chart(fig_ra, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):
@@ -666,11 +686,17 @@ def main():
                     color="TDL Sum Tickets (B+S-A)",
                     color_continuous_scale="Blues"
                 )
-                fig_top_bairros.update_traces(textposition='outside')
+                fonts = get_font_sizes(escala)
+                fig_top_bairros.update_traces(textposition='outside', textfont_size=fonts['annotation'])
                 fig_top_bairros.update_layout(
                     xaxis={'categoryorder':'total descending'},
                     height=500,
-                    showlegend=False
+                    showlegend=False,
+                    title_font_size=fonts['title'],
+                    xaxis_title_font_size=fonts['axis'],
+                    yaxis_title_font_size=fonts['axis'],
+                    xaxis_tickfont_size=fonts['tick'],
+                    yaxis_tickfont_size=fonts['tick']
                 )
                 st.plotly_chart(fig_top_bairros, use_container_width=True, config=get_plotly_config(escala))
             
@@ -906,7 +932,16 @@ def main():
                                 borderpad=3
                             )
                         
-                        fig_cat_dia.update_layout(height=500)
+                        fonts = get_font_sizes(escala)
+                        fig_cat_dia.update_layout(
+                            height=500,
+                            title_font_size=fonts['title'],
+                            xaxis_title_font_size=fonts['axis'],
+                            yaxis_title_font_size=fonts['axis'],
+                            xaxis_tickfont_size=fonts['tick'],
+                            yaxis_tickfont_size=fonts['tick'],
+                            legend_font_size=fonts['legend']
+                        )
                         st.plotly_chart(fig_cat_dia, use_container_width=True, config=get_plotly_config(escala))
                 else:
                     st.info("Não há dados de categorias mapeadas para o período selecionado.")
@@ -944,11 +979,17 @@ def main():
                 color_continuous_scale="Blues"
             )
             
-            fig_total.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_total.update_traces(textposition='outside', textfont_size=fonts['annotation'])
             fig_total.update_layout(
                 xaxis={'categoryorder':'total descending'},
                 height=500,
-                showlegend=False
+                showlegend=False,
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
             )
             
             st.plotly_chart(fig_total, use_container_width=True, config=get_plotly_config(escala))
@@ -991,11 +1032,17 @@ def main():
                 color_continuous_scale="Blues"
             )
             
-            fig_fornecedores.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_fornecedores.update_traces(textposition='outside', textfont_size=fonts['annotation'])
             fig_fornecedores.update_layout(
                 xaxis={'categoryorder':'total descending'},
                 height=500,
-                showlegend=False
+                showlegend=False,
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
             )
             
             st.plotly_chart(fig_fornecedores, use_container_width=True, config=get_plotly_config(escala))
@@ -1063,7 +1110,17 @@ def main():
                         font=dict(size=11, color="white", family="Arial")
                     )
                 
-                fig_total.update_layout(height=500, yaxis_title="Percentual (%)")
+                fonts = get_font_sizes(escala)
+                fig_total.update_layout(
+                    height=500,
+                    yaxis_title="Percentual (%)",
+                    title_font_size=fonts['title'],
+                    xaxis_title_font_size=fonts['axis'],
+                    yaxis_title_font_size=fonts['axis'],
+                    xaxis_tickfont_size=fonts['tick'],
+                    yaxis_tickfont_size=fonts['tick'],
+                    legend_font_size=fonts['legend']
+                )
                 st.plotly_chart(fig_total, use_container_width=True, config=get_plotly_config(escala))
                 
                 with st.expander("📊 Ver dados da tabela"):
@@ -1108,7 +1165,15 @@ def main():
                 title="Total de profissionais por dia da semana",
                 text=profissionais_por_dia["Percentual"].apply(lambda x: f"{x}%")
             )
-            fig_dia.update_traces(textposition='outside')
+            fonts = get_font_sizes(escala)
+            fig_dia.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+            fig_dia.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick']
+            )
             st.plotly_chart(fig_dia, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
