@@ -25,7 +25,7 @@ def get_font_sizes(escala=2):
         'axis': 18,
         'tick': 16,
         'legend': 16,
-        'annotation': 14
+        'annotation': 16
     }
 
 
