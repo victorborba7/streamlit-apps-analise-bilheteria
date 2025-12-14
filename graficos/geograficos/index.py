@@ -8,6 +8,21 @@ import numpy as np
 import unicodedata
 
 
+def get_plotly_config(escala=2):
+    """Retorna configuração otimizada para gráficos Plotly"""
+    return {
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': 'grafico_arena_jockey',
+            'height': 1080,
+            'width': 1920,
+            'scale': escala
+        },
+        'displayModeBar': True,
+        'displaylogo': False
+    }
+
+
 def remover_acentos(texto):
     """Remove acentos de uma string"""
     if pd.isna(texto):
@@ -16,7 +31,7 @@ def remover_acentos(texto):
     return ''.join([c for c in nfkd if not unicodedata.combining(c)])
 
 
-def mapa_brasil(df_b, carregar_geojson_brasil_func):
+def mapa_brasil(df_b, carregar_geojson_brasil_func, escala=2):
     """Exibe mapa do Brasil com distribuição de ingressos por estado"""
     st.markdown("#### 🗺️ Distribuição de Ingressos no Brasil")
     
@@ -127,7 +142,7 @@ def mapa_brasil(df_b, carregar_geojson_brasil_func):
                         margin={"r":0,"t":40,"l":0,"b":0}
                     )
                     
-                    st.plotly_chart(fig_brasil, use_container_width=True)
+                    st.plotly_chart(fig_brasil, use_container_width=True, config=get_plotly_config(escala))
                     
                     # Tabela com dados
                     with st.expander("📊 Ver dados por estado"):
@@ -166,13 +181,13 @@ def mapa_brasil(df_b, carregar_geojson_brasil_func):
                 color_continuous_scale="Blues"
             )
             fig_pais.update_traces(textposition='outside')
-            st.plotly_chart(fig_pais, use_container_width=True)
+            st.plotly_chart(fig_pais, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver todos os países"):
                 st.dataframe(por_pais, hide_index=True, use_container_width=True)
 
 
-def mapa_estado_rj(df_b, carregar_geojson_municipios_rj_func):
+def mapa_estado_rj(df_b, carregar_geojson_municipios_rj_func, escala=2):
     """Exibe mapa do Estado do Rio de Janeiro com distribuição por município"""
     st.markdown("#### 🗺️ Distribuição de Ingressos no Estado do Rio de Janeiro")
     
@@ -257,7 +272,7 @@ def mapa_estado_rj(df_b, carregar_geojson_municipios_rj_func):
                             margin={"r":0,"t":40,"l":0,"b":0}
                         )
                         
-                        st.plotly_chart(fig_rj, use_container_width=True)
+                        st.plotly_chart(fig_rj, use_container_width=True, config=get_plotly_config(escala))
                         
                         # Tabela com dados
                         with st.expander("📊 Ver dados por município"):
@@ -277,7 +292,7 @@ def mapa_estado_rj(df_b, carregar_geojson_municipios_rj_func):
         st.info("Colunas 'uf_google' e/ou 'cidade_google_norm' não encontradas para criar o mapa do RJ.")
 
 
-def mapa_ras_capital(df_b, carregar_geojson_ras_func):
+def mapa_ras_capital(df_b, carregar_geojson_ras_func, escala=2):
     """Exibe mapa das Regiões Administrativas da capital do RJ"""
     st.markdown("#### Mapa Oficial - Ingressos por Região Administrativa")
     if not df_b.empty and "RA" in df_b.columns:
@@ -366,7 +381,7 @@ def mapa_ras_capital(df_b, carregar_geojson_ras_func):
                         margin={"r":0,"t":40,"l":0,"b":0}
                     )
                     
-                    st.plotly_chart(fig_mapa_ra_oficial, use_container_width=True)
+                    st.plotly_chart(fig_mapa_ra_oficial, use_container_width=True, config=get_plotly_config(escala))
                     
                     # Mostra tabela com dados
                     with st.expander("📊 Ver dados detalhados por RA"):
@@ -387,7 +402,7 @@ def mapa_ras_capital(df_b, carregar_geojson_ras_func):
             st.info("Não foi possível carregar os limites oficiais das Regiões Administrativas.")
 
 
-def grafico_bairros_por_tipo_ingresso(df_b):
+def grafico_bairros_por_tipo_ingresso(df_b, escala=2):
     """Exibe gráfico de bairros por tipo de ingresso"""
     st.markdown("#### Bairros por Tipo de Ingresso")
     bairro_col = "bairro_google_norm"
@@ -439,7 +454,7 @@ def grafico_bairros_por_tipo_ingresso(df_b):
                 height=500
             )
             
-            st.plotly_chart(fig_bairro_tipo, use_container_width=True)
+            st.plotly_chart(fig_bairro_tipo, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 # Cria tabela pivotada para melhor visualização

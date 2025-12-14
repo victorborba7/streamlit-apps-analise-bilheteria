@@ -15,6 +15,34 @@ from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_cap
 
 
 # ==============================
+# Configuração de gráficos
+# ==============================
+def get_plotly_config(escala=2):
+    """
+    Retorna configuração otimizada para gráficos Plotly com alta qualidade.
+    
+    Args:
+        escala: Multiplicador de resolução (1, 2, 3 ou 4)
+    
+    Returns:
+        dict: Configuração para st.plotly_chart
+    """
+    return {
+        'toImageButtonOptions': {
+            'format': 'png',  # Formato PNG para melhor qualidade
+            'filename': 'grafico_arena_jockey',
+            'height': 1080,
+            'width': 1920,
+            'scale': escala  # Multiplicador de resolução
+        },
+        'displayModeBar': True,  # Sempre mostra a barra de ferramentas
+        'displaylogo': False,  # Remove logo do Plotly
+        'modeBarButtonsToAdd': ['hoverclosest', 'hovercompare'],
+        'modeBarButtonsToRemove': []
+    }
+
+
+# ==============================
 # Carregamento dos dados
 # ==============================
 def load_file_from_github(url, headers):
@@ -316,6 +344,28 @@ def main():
     st.title("📊 Dashboard Arena Jockey")
     st.markdown("Versão inicial do painel de **Bilhetagem** e **Credenciamento**.")
 
+    # Configuração de qualidade dos gráficos
+    with st.expander("⚙️ Configurações de Qualidade dos Gráficos"):
+        escala_opcoes = {
+            "Padrão (1x)": 1,
+            "Alta (2x)": 2,
+            "Muito Alta (3x)": 3
+        }
+        escala_selecionada = st.radio(
+            "Qualidade para download de gráficos:",
+            options=list(escala_opcoes.keys()),
+            index=1,
+            horizontal=True,
+            help="Escolha a qualidade dos gráficos. Maior qualidade = melhor resolução para apresentações, mas arquivos maiores."
+        )
+        escala = escala_opcoes[escala_selecionada]
+        
+        col_info1, col_info2 = st.columns([2, 1])
+        with col_info1:
+            st.info(f"💡 **Como usar:** Passe o mouse sobre qualquer gráfico e clique no botão 📷 (câmera) no canto superior direito para baixar em PNG de alta qualidade ({1920*escala}x{1080*escala}px).")
+        with col_info2:
+            st.success(f"✅ **Qualidade selecionada:** {escala_selecionada}")
+
     # Carrega dados
     bilhetes, cred_2025, cred_2024 = load_data()
 
@@ -451,6 +501,26 @@ def main():
         col_e.metric("Ticket médio (R$)", f"{ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col_f.metric("Clientes recorrentes", f"{qtd_recorrentes} ({perc_recorrentes:.1f}%)")
         
+        # Métricas de Ingresso Solidário
+        st.markdown("---")
+        st.markdown("#### 🤝 Ingresso Solidário")
+        col_solid_a, col_solid_b, col_solid_c = st.columns(3)
+        
+        # Calcula métricas do ingresso solidário
+        if "TDL Ticket Type" in df_b.columns:
+            ingressos_solidarios = df_b[df_b["TDL Ticket Type"].str.upper().str.contains("SOLIDÁRIO", na=False)]
+            qtd_solidarios = ingressos_solidarios["TDL Sum Tickets (B+S-A)"].sum()
+            montante_social = qtd_solidarios * 10.00
+            perc_solidarios = (qtd_solidarios / total_ingressos * 100) if total_ingressos > 0 else 0
+        else:
+            qtd_solidarios = 0
+            montante_social = 0
+            perc_solidarios = 0
+        
+        col_solid_a.metric("Ingressos Solidários", f"{int(qtd_solidarios)} ({perc_solidarios:.1f}%)")
+        col_solid_b.metric("Montante para Ações Sociais (R$)", f"{montante_social:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col_solid_c.metric("Valor por Ingresso", "R$ 10,00")
+        
         # Botão de download das métricas
         st.markdown("---")
         metricas_resumo = pd.DataFrame({
@@ -461,7 +531,10 @@ def main():
                 "Média de ingressos por CPF",
                 "Ticket médio (R$)",
                 "Clientes recorrentes (quantidade)",
-                "Clientes recorrentes (%)"
+                "Clientes recorrentes (%)",
+                "Ingressos Solidários (quantidade)",
+                "Ingressos Solidários (%)",
+                "Montante para Ações Sociais (R$)"
             ],
             "Valor": [
                 int(total_ingressos),
@@ -470,7 +543,10 @@ def main():
                 f"{media_ingressos_por_cpf:.2f}",
                 f"{ticket_medio:,.2f}",
                 int(qtd_recorrentes),
-                f"{perc_recorrentes:.1f}"
+                f"{perc_recorrentes:.1f}",
+                int(qtd_solidarios),
+                f"{perc_solidarios:.1f}",
+                f"{montante_social:,.2f}"
             ]
         })
         
@@ -488,18 +564,18 @@ def main():
         # ==============================
         st.markdown("---")
         # Análise de comportamento de compra (função modular)
-        analise_comportamento_compra(df_b)
+        analise_comportamento_compra(df_b, escala)
 
         # ==============================
         # Dados Demográficos
         # ==============================
         st.markdown("---")
         # Análise demográfica (função modular)
-        analise_demografica(df_b)
+        analise_demografica(df_b, escala)
 
         st.markdown("---")
         # Gráfico de vendas ao longo do tempo (função modular)
-        grafico_vendas_ao_longo_do_tempo(df_b)
+        grafico_vendas_ao_longo_do_tempo(df_b, escala)
 
         st.markdown("#### Top Regiões Administrativas (Ingressos)")
         if not df_b.empty:
@@ -529,7 +605,7 @@ def main():
             )
             fig_ra.update_traces(textposition='outside')
             fig_ra.update_layout(height=450, showlegend=False)
-            st.plotly_chart(fig_ra, use_container_width=True)
+            st.plotly_chart(fig_ra, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):
             por_ra_display = por_ra[["RA", "TDL Sum Tickets (B+S-A)", "Percentual"]].copy()
@@ -543,19 +619,19 @@ def main():
         # Mapa do Brasil
         # ==============================
         # Mapa do Brasil (função modular)
-        mapa_brasil(df_b, carregar_geojson_brasil)
+        mapa_brasil(df_b, carregar_geojson_brasil, escala)
 
         # ==============================
         # Mapa do Estado do Rio de Janeiro
         # ==============================
         # Mapa do Estado do RJ (função modular)
-        mapa_estado_rj(df_b, carregar_geojson_municipios_rj)
+        mapa_estado_rj(df_b, carregar_geojson_municipios_rj, escala)
 
         # Mapa das RAs da capital (função modular)
-        mapa_ras_capital(df_b, carregar_geojson_ras)
+        mapa_ras_capital(df_b, carregar_geojson_ras, escala)
 
         # Gráfico de bairros por tipo de ingresso (função modular)
-        grafico_bairros_por_tipo_ingresso(df_b)
+        grafico_bairros_por_tipo_ingresso(df_b, escala)
 
         # Top 10 Bairros
         st.markdown("#### Top 10 Bairros por Total de Ingressos")
@@ -596,7 +672,7 @@ def main():
                     height=500,
                     showlegend=False
                 )
-                st.plotly_chart(fig_top_bairros, use_container_width=True)
+                st.plotly_chart(fig_top_bairros, use_container_width=True, config=get_plotly_config(escala))
             
             with col_tabela:
                 # Formata para exibição
@@ -831,7 +907,7 @@ def main():
                             )
                         
                         fig_cat_dia.update_layout(height=500)
-                        st.plotly_chart(fig_cat_dia, use_container_width=True)
+                        st.plotly_chart(fig_cat_dia, use_container_width=True, config=get_plotly_config(escala))
                 else:
                     st.info("Não há dados de categorias mapeadas para o período selecionado.")
             
@@ -875,7 +951,7 @@ def main():
                 showlegend=False
             )
             
-            st.plotly_chart(fig_total, use_container_width=True)
+            st.plotly_chart(fig_total, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 total_cat_display = total_cat.copy()
@@ -922,7 +998,7 @@ def main():
                 showlegend=False
             )
             
-            st.plotly_chart(fig_fornecedores, use_container_width=True)
+            st.plotly_chart(fig_fornecedores, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 st.dataframe(fornecedores_por_cat, hide_index=True, use_container_width=True)
@@ -988,7 +1064,7 @@ def main():
                     )
                 
                 fig_total.update_layout(height=500, yaxis_title="Percentual (%)")
-                st.plotly_chart(fig_total, use_container_width=True)
+                st.plotly_chart(fig_total, use_container_width=True, config=get_plotly_config(escala))
                 
                 with st.expander("📊 Ver dados da tabela"):
                     # Cria tabela pivotada para melhor visualização
@@ -1033,7 +1109,7 @@ def main():
                 text=profissionais_por_dia["Percentual"].apply(lambda x: f"{x}%")
             )
             fig_dia.update_traces(textposition='outside')
-            st.plotly_chart(fig_dia, use_container_width=True)
+            st.plotly_chart(fig_dia, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 profissionais_por_dia_display = profissionais_por_dia[["dia_label", "Total", "Percentual"]].copy()

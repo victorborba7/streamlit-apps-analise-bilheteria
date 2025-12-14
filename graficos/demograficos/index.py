@@ -3,7 +3,22 @@ import pandas as pd
 import plotly.express as px
 
 
-def analise_demografica(df_b):
+def get_plotly_config(escala=2):
+    """Retorna configuração otimizada para gráficos Plotly"""
+    return {
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': 'grafico_arena_jockey',
+            'height': 1080,
+            'width': 1920,
+            'scale': escala
+        },
+        'displayModeBar': True,
+        'displaylogo': False
+    }
+
+
+def analise_demografica(df_b, escala=2):
     """Exibe análises demográficas dos clientes"""
     st.markdown("### 👥 Perfil Demográfico dos Clientes")
     
@@ -37,7 +52,7 @@ def analise_demografica(df_b):
                 title="Ingressos por Gênero",
                 hole=0.4
             )
-            st.plotly_chart(fig_genero, use_container_width=True)
+            st.plotly_chart(fig_genero, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 st.dataframe(genero_count, hide_index=True, use_container_width=True)
@@ -64,7 +79,7 @@ def analise_demografica(df_b):
                 text=idade_count["Percentual"].apply(lambda x: f"{x}%")
             )
             fig_idade.update_traces(textposition='outside')
-            st.plotly_chart(fig_idade, use_container_width=True)
+            st.plotly_chart(fig_idade, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 st.dataframe(idade_count, hide_index=True, use_container_width=True)
@@ -116,7 +131,7 @@ def analise_demografica(df_b):
             text=cruzamento["Percentual"].apply(lambda x: f"{x}%")
         )
         fig_cruzamento.update_traces(textposition='outside')
-        st.plotly_chart(fig_cruzamento, use_container_width=True)
+        st.plotly_chart(fig_cruzamento, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):
             # Cria tabela pivotada para melhor visualização

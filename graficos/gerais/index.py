@@ -3,7 +3,22 @@ import pandas as pd
 import plotly.express as px
 
 
-def grafico_vendas_ao_longo_do_tempo(df_b):
+def get_plotly_config(escala=2):
+    """Retorna configuração otimizada para gráficos Plotly"""
+    return {
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': 'grafico_arena_jockey',
+            'height': 1080,
+            'width': 1920,
+            'scale': escala
+        },
+        'displayModeBar': True,
+        'displaylogo': False
+    }
+
+
+def grafico_vendas_ao_longo_do_tempo(df_b, escala=2):
     """Exibe gráfico de linha mostrando ingressos vendidos ao longo do tempo"""
     st.markdown("#### Ingressos ao longo do tempo")
     if not df_b.empty:
@@ -23,7 +38,7 @@ def grafico_vendas_ao_longo_do_tempo(df_b):
             },
             title="Ingressos vendidos por dia"
         )
-        st.plotly_chart(fig_tempo, use_container_width=True)
+        st.plotly_chart(fig_tempo, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):
             vendas_por_dia_display = vendas_por_dia.copy()
@@ -32,7 +47,7 @@ def grafico_vendas_ao_longo_do_tempo(df_b):
             st.dataframe(vendas_por_dia_display, hide_index=True, use_container_width=True)
 
 
-def analise_comportamento_compra(df_b):
+def analise_comportamento_compra(df_b, escala=2):
     """Exibe análises de comportamento de compra dos clientes"""
     st.markdown("### 🛒 Comportamento de Compra")
     
@@ -71,7 +86,7 @@ def analise_comportamento_compra(df_b):
                 text=dist_faixa["Percentual"].apply(lambda x: f"{x}%")
             )
             fig_dist.update_traces(textposition='outside')
-            st.plotly_chart(fig_dist, use_container_width=True)
+            st.plotly_chart(fig_dist, use_container_width=True, config=get_plotly_config(escala))
             
             with st.expander("📊 Ver dados da tabela"):
                 st.dataframe(dist_faixa, hide_index=True, use_container_width=True)
@@ -163,7 +178,7 @@ def analise_comportamento_compra(df_b):
             title="Distribuição de clientes por número de eventos diferentes frequentados",
             hole=0.4
         )
-        st.plotly_chart(fig_recorrencia, use_container_width=True)
+        st.plotly_chart(fig_recorrencia, use_container_width=True, config=get_plotly_config(escala))
         
         with st.expander("📊 Ver dados da tabela"):
             st.dataframe(dist_recorrencia, hide_index=True, use_container_width=True)
