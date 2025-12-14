@@ -13,7 +13,6 @@ from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comp
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
 
-
 # ==============================
 # Configuração de gráficos
 # ==============================
@@ -1205,3 +1204,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
