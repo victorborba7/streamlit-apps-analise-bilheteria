@@ -9,7 +9,7 @@ import geopandas as gpd
 import json
 
 # Imports dos módulos de gráficos
-from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra
+from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
 
@@ -577,6 +577,13 @@ def main():
         analise_comportamento_compra(df_b, escala)
 
         # ==============================
+        # Análise de Tipo de Ingresso por Evento
+        # ==============================
+        st.markdown("---")
+        # Gráfico de pizza de tipo de ingresso por evento (função modular)
+        grafico_pizza_tipo_ingresso_por_evento(df_b, escala)
+
+        # ==============================
         # Dados Demográficos
         # ==============================
         st.markdown("---")
@@ -858,6 +865,85 @@ def main():
             total_empresas = df_c["EMPRESA"].nunique()
             col_c.metric("Empresas envolvidas", int(total_empresas))
 
+        # Gráfico de pizza: Contagem por Categoria
+        st.markdown("---")
+        st.markdown("#### 📊 Distribuição de Credenciamentos por Categoria")
+        
+        if "CATEGORIA" in df_c.columns:
+            # Filtra categorias válidas
+            df_c_cat_validas = df_c[
+                df_c["CATEGORIA"].notna() & 
+                (df_c["CATEGORIA"] != 'nan') & 
+                (df_c["CATEGORIA"] != 'None') &
+                (df_c["CATEGORIA"] != '')
+            ]
+            
+            if not df_c_cat_validas.empty:
+                # Conta credenciamentos por categoria
+                contagem_categoria = (
+                    df_c_cat_validas["CATEGORIA"]
+                    .value_counts()
+                    .reset_index()
+                )
+                contagem_categoria.columns = ["Categoria", "Quantidade"]
+                
+                # Calcula percentuais
+                total_cat_pizza = contagem_categoria["Quantidade"].sum()
+                contagem_categoria["Percentual"] = (contagem_categoria["Quantidade"] / total_cat_pizza * 100).round(2)
+                
+                # Layout com duas colunas: gráfico e tabela
+                col_grafico_cat, col_tabela_cat = st.columns([2, 1])
+                
+                with col_grafico_cat:
+                    # Cria gráfico de pizza
+                    fig_pizza_cat = px.pie(
+                        contagem_categoria,
+                        values="Quantidade",
+                        names="Categoria",
+                        title="Credenciamentos por Categoria",
+                        hole=0.4,
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    
+                    fonts = get_font_sizes(escala)
+                    fig_pizza_cat.update_traces(
+                        textposition='auto',
+                        textinfo='percent+label',
+                        textfont_size=fonts['annotation']
+                    )
+                    fig_pizza_cat.update_layout(
+                        title_font_size=fonts['title'],
+                        legend_font_size=fonts['legend'],
+                        font_size=fonts['annotation'],
+                        height=500
+                    )
+                    
+                    st.plotly_chart(fig_pizza_cat, use_container_width=True, config=get_plotly_config(escala))
+                
+                with col_tabela_cat:
+                    # Exibe tabela com os dados
+                    contagem_categoria_display = contagem_categoria.copy()
+                    contagem_categoria_display["Percentual"] = contagem_categoria_display["Percentual"].apply(lambda x: f"{x}%")
+                    contagem_categoria_display.index = range(1, len(contagem_categoria_display) + 1)
+                    
+                    st.markdown("#### Detalhamento")
+                    st.dataframe(contagem_categoria_display, use_container_width=True, height=500)
+                
+                # Botão de download
+                csv_categoria = contagem_categoria_display.to_csv(index=True, encoding='utf-8-sig')
+                st.download_button(
+                    label="📥 Download Contagem por Categoria (CSV)",
+                    data=csv_categoria,
+                    file_name="credenciamento_por_categoria.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("Não há dados válidos de categoria disponíveis.")
+        else:
+            st.info("Coluna de categoria não disponível nos dados.")
+
+        st.markdown("---")
         # Análise de profissionais por categoria e dia
         if "CATEGORIA" in df_c.columns and "DATA" in df_c.columns:
             st.markdown("#### Profissionais por Categoria e Dia")

@@ -215,3 +215,167 @@ def analise_comportamento_compra(df_b, escala=2):
         
         with st.expander("📊 Ver dados da tabela"):
             st.dataframe(dist_recorrencia, hide_index=True, use_container_width=True)
+
+
+def grafico_pizza_tipo_ingresso_por_evento(df_b, escala=2):
+    """Exibe gráfico de pizza para avaliar o percentual do tipo de ingresso comprado para cada evento"""
+    st.markdown("### 🎫 Tipo de Ingresso por Evento")
+    
+    if df_b.empty:
+        st.info("Não há dados disponíveis para exibir o gráfico.")
+        return
+    
+    # Identifica a coluna de tipo de ingresso
+    tipo_ingresso_col = None
+    if "TDL Price Category" in df_b.columns:
+        tipo_ingresso_col = "TDL Price Category"
+    elif "TDL Ticket Type" in df_b.columns:
+        tipo_ingresso_col = "TDL Ticket Type"
+    
+    if tipo_ingresso_col is None or "TDL Event" not in df_b.columns:
+        st.info("Dados de tipo de ingresso ou evento não disponíveis.")
+        return
+    
+    # Obtém lista de eventos
+    eventos = sorted(df_b["TDL Event"].dropna().unique())
+    
+    if len(eventos) == 0:
+        st.info("Nenhum evento encontrado nos dados.")
+        return
+    
+    # Permite ao usuário selecionar um evento específico ou ver todos
+    evento_selecionado = st.selectbox(
+        "Selecione um evento para análise:",
+        ["Todos os eventos"] + list(eventos),
+        key="select_evento_pizza"
+    )
+    
+    # Filtra os dados conforme seleção
+    if evento_selecionado == "Todos os eventos":
+        df_filtrado = df_b.copy()
+        titulo = "Distribuição de Tipos de Ingresso - Todos os Eventos"
+    else:
+        df_filtrado = df_b[df_b["TDL Event"] == evento_selecionado].copy()
+        titulo = f"Distribuição de Tipos de Ingresso - {evento_selecionado}"
+    
+    # Agrupa por tipo de ingresso
+    tipo_ingresso_count = (
+        df_filtrado[df_filtrado[tipo_ingresso_col].notna()]
+        .groupby(tipo_ingresso_col)["TDL Sum Tickets (B+S-A)"]
+        .sum()
+        .reset_index()
+    )
+    tipo_ingresso_count.columns = ["Tipo de Ingresso", "Quantidade"]
+    tipo_ingresso_count = tipo_ingresso_count.sort_values("Quantidade", ascending=False)
+    
+    if tipo_ingresso_count.empty:
+        st.info(f"Não há dados de tipo de ingresso disponíveis para {evento_selecionado}.")
+        return
+    
+    # Calcula percentuais
+    total = tipo_ingresso_count["Quantidade"].sum()
+    tipo_ingresso_count["Percentual"] = (tipo_ingresso_count["Quantidade"] / total * 100).round(2)
+    
+    # Layout com duas colunas: gráfico e tabela
+    col_grafico, col_tabela = st.columns([2, 1])
+    
+    with col_grafico:
+        # Cria o gráfico de pizza
+        fig_pizza = px.pie(
+            tipo_ingresso_count,
+            values="Quantidade",
+            names="Tipo de Ingresso",
+            title=titulo,
+            hole=0.4,
+            color_discrete_sequence=px.colors.qualitative.Set3
+        )
+        
+        fonts = get_font_sizes(escala)
+        fig_pizza.update_traces(
+            textposition='auto',
+            textinfo='percent+label',
+            textfont_size=fonts['annotation']
+        )
+        fig_pizza.update_layout(
+            title_font_size=fonts['title'],
+            legend_font_size=fonts['legend'],
+            font_size=fonts['annotation'],
+            height=500
+        )
+        
+        st.plotly_chart(fig_pizza, use_container_width=True, config=get_plotly_config(escala))
+    
+    with col_tabela:
+        # Exibe tabela com os dados
+        tipo_ingresso_display = tipo_ingresso_count.copy()
+        tipo_ingresso_display["Quantidade"] = tipo_ingresso_display["Quantidade"].astype(int)
+        tipo_ingresso_display["Percentual"] = tipo_ingresso_display["Percentual"].apply(lambda x: f"{x}%")
+        tipo_ingresso_display.index = range(1, len(tipo_ingresso_display) + 1)
+        
+        st.markdown("#### Detalhamento")
+        st.dataframe(tipo_ingresso_display, use_container_width=True, height=500)
+    
+    # Botão de download
+    csv_tipo_ingresso = tipo_ingresso_display.to_csv(index=True, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 Download Dados (CSV)",
+        data=csv_tipo_ingresso,
+        file_name=f"tipo_ingresso_{evento_selecionado.replace(' ', '_').lower()}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    
+    # Análise adicional: comparação entre eventos (se "Todos os eventos" estiver selecionado)
+    if evento_selecionado == "Todos os eventos" and len(eventos) > 1:
+        st.markdown("---")
+        st.markdown("#### 📊 Comparação entre Eventos")
+        
+        # Cria tabela cruzada: eventos x tipos de ingresso
+        comparacao = (
+            df_b[df_b[tipo_ingresso_col].notna() & df_b["TDL Event"].notna()]
+            .groupby(["TDL Event", tipo_ingresso_col])["TDL Sum Tickets (B+S-A)"]
+            .sum()
+            .reset_index()
+        )
+        comparacao.columns = ["Evento", "Tipo de Ingresso", "Quantidade"]
+        
+        # Cria gráfico de barras agrupadas
+        fig_comparacao = px.bar(
+            comparacao,
+            x="Evento",
+            y="Quantidade",
+            color="Tipo de Ingresso",
+            title="Distribuição de Tipos de Ingresso por Evento",
+            labels={"Quantidade": "Ingressos", "Evento": "Evento"},
+            barmode="group",
+            color_discrete_sequence=px.colors.qualitative.Set3
+        )
+        
+        fonts = get_font_sizes(escala)
+        fig_comparacao.update_layout(
+            title_font_size=fonts['title'],
+            xaxis_title_font_size=fonts['axis'],
+            yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
+            height=500
+        )
+        
+        st.plotly_chart(fig_comparacao, use_container_width=True, config=get_plotly_config(escala))
+        
+        with st.expander("📊 Ver dados da comparação"):
+            # Cria tabela pivotada para melhor visualização
+            tabela_comparacao = comparacao.pivot(
+                index="Evento",
+                columns="Tipo de Ingresso",
+                values="Quantidade"
+            ).fillna(0).astype(int)
+            
+            # Adiciona coluna de total
+            tabela_comparacao["Total"] = tabela_comparacao.sum(axis=1)
+            
+            # Ordena por total
+            tabela_comparacao = tabela_comparacao.sort_values("Total", ascending=False)
+            
+            st.dataframe(tabela_comparacao, use_container_width=True)
