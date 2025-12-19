@@ -823,6 +823,10 @@ def main():
 
         # Aplica filtros
         df_c = cred.copy()
+        
+        # Agrupa PATROCINADOR e PATROCINADOR MM como STAFF
+        if "CATEGORIA" in df_c.columns:
+            df_c.loc[df_c["CATEGORIA"].isin(["PATROCINADOR", "PATROCINADOR MM"]), "CATEGORIA"] = "STAFF"
 
         if etapa_sel and "ETAPA" in df_c.columns:
             df_c = df_c[df_c["ETAPA"].isin(etapa_sel)]
