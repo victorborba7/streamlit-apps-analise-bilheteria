@@ -227,9 +227,7 @@ def grafico_pizza_tipo_ingresso_por_evento(df_b, escala=2):
     
     # Identifica a coluna de tipo de ingresso
     tipo_ingresso_col = None
-    if "TDL Price Category" in df_b.columns:
-        tipo_ingresso_col = "TDL Price Category"
-    elif "TDL Ticket Type" in df_b.columns:
+    if "TDL Ticket Type" in df_b.columns:
         tipo_ingresso_col = "TDL Ticket Type"
     
     if tipo_ingresso_col is None or "TDL Event" not in df_b.columns:
