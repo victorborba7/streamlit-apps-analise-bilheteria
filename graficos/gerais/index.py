@@ -217,6 +217,403 @@ def analise_comportamento_compra(df_b, escala=2):
             st.dataframe(dist_recorrencia, hide_index=True, use_container_width=True)
 
 
+def analise_turismo_por_periodo(df_b, escala=2):
+    """Analisa mudanças no perfil do público por período, identificando turistas nacionais e internacionais"""
+    st.markdown("### 🌍 Análise de Turismo por Período")
+    st.markdown("Identifica variações no perfil do público ao longo do tempo, destacando a presença de turistas")
+    
+    if df_b.empty or "TDL Event Date" not in df_b.columns:
+        st.info("Não há dados disponíveis para análise.")
+        return
+    
+    # Adiciona coluna de mês/ano
+    df_analise = df_b.copy()
+    df_analise["Mes_Ano"] = df_analise["TDL Event Date"].dt.to_period('M').astype(str)
+    df_analise["Mes_Nome"] = df_analise["TDL Event Date"].dt.strftime('%B/%Y')
+    
+    # Mapeamento de meses em português
+    meses_pt = {
+        'January': 'Janeiro', 'February': 'Fevereiro', 'March': 'Março',
+        'April': 'Abril', 'May': 'Maio', 'June': 'Junho',
+        'July': 'Julho', 'August': 'Agosto', 'September': 'Setembro',
+        'October': 'Outubro', 'November': 'Novembro', 'December': 'Dezembro'
+    }
+    for en, pt in meses_pt.items():
+        df_analise["Mes_Nome"] = df_analise["Mes_Nome"].str.replace(en, pt)
+    
+    # Classifica origem: Rio de Janeiro, Outros Estados, Internacional
+    def classificar_origem(row):
+        # Usa uf_google se disponível, senão TDL Customer State
+        estado = row.get("uf_google", row.get("TDL Customer State", ""))
+        pais = row.get("TDL Customer Country", "")
+        
+        if pd.isna(pais) or pais == "":
+            return "Não informado"
+        
+        if pais.upper() not in ["BRAZIL", "BRASIL", "BR"]:
+            return "Internacional"
+        
+        if pd.isna(estado) or estado == "":
+            return "Brasil - Estado não informado"
+        
+        if estado.upper() in ["RJ", "RIO DE JANEIRO"]:
+            return "Rio de Janeiro"
+        else:
+            return "Outros Estados (Brasil)"
+    
+    df_analise["Origem_Classificada"] = df_analise.apply(classificar_origem, axis=1)
+    
+    # Agrupa por mês e origem
+    evolucao = (
+        df_analise.groupby(["Mes_Ano", "Mes_Nome", "Origem_Classificada"])["TDL Sum Tickets (B+S-A)"]
+        .sum()
+        .reset_index()
+    )
+    evolucao.columns = ["Mes_Ano", "Mes_Nome", "Origem", "Ingressos"]
+    
+    # Calcula percentuais por mês
+    total_por_mes = evolucao.groupby("Mes_Ano")["Ingressos"].sum().reset_index()
+    total_por_mes.columns = ["Mes_Ano", "Total_Mes"]
+    evolucao = evolucao.merge(total_por_mes, on="Mes_Ano")
+    evolucao["Percentual"] = (evolucao["Ingressos"] / evolucao["Total_Mes"] * 100).round(1)
+    
+    # Ordena por data
+    evolucao = evolucao.sort_values("Mes_Ano")
+    
+    # Define cores para cada categoria
+    cores_origem = {
+        "Rio de Janeiro": "#1f77b4",
+        "Outros Estados (Brasil)": "#ff7f0e",
+        "Internacional": "#2ca02c",
+        "Brasil - Estado não informado": "#d62728",
+        "Não informado": "#9467bd"
+    }
+    
+    # Gráfico 1: Evolução em valores absolutos
+    st.markdown("#### 📊 Evolução do Público por Origem (Valores Absolutos)")
+    fig_abs = px.bar(
+        evolucao,
+        x="Mes_Nome",
+        y="Ingressos",
+        color="Origem",
+        title="Distribuição do Público por Origem ao Longo do Tempo",
+        labels={"Mes_Nome": "Mês", "Ingressos": "Quantidade de Ingressos"},
+        barmode="stack",
+        color_discrete_map=cores_origem
+    )
+    
+    fonts = get_font_sizes(escala)
+    fig_abs.update_layout(
+        title_font_size=fonts['title'],
+        xaxis_title_font_size=fonts['axis'],
+        yaxis_title_font_size=fonts['axis'],
+        xaxis_tickfont_size=fonts['tick'],
+        yaxis_tickfont_size=fonts['tick'],
+        legend_font_size=fonts['legend'],
+        height=500
+    )
+    st.plotly_chart(fig_abs, use_container_width=True, config=get_plotly_config(escala))
+    
+    # Gráfico 2: Evolução em percentuais
+    st.markdown("#### 📈 Evolução do Público por Origem (Percentuais)")
+    fig_perc = px.bar(
+        evolucao,
+        x="Mes_Nome",
+        y="Percentual",
+        color="Origem",
+        title="Proporção do Público por Origem ao Longo do Tempo (%)",
+        labels={"Mes_Nome": "Mês", "Percentual": "Percentual (%)"},
+        barmode="stack",
+        color_discrete_map=cores_origem,
+        text=evolucao["Percentual"].apply(lambda x: f"{x:.1f}%" if x > 5 else "")
+    )
+    
+    fig_perc.update_traces(textposition='inside', textfont_size=fonts['annotation'])
+    fig_perc.update_layout(
+        title_font_size=fonts['title'],
+        xaxis_title_font_size=fonts['axis'],
+        yaxis_title_font_size=fonts['axis'],
+        xaxis_tickfont_size=fonts['tick'],
+        yaxis_tickfont_size=fonts['tick'],
+        legend_font_size=fonts['legend'],
+        height=500,
+        yaxis_range=[0, 100]
+    )
+    st.plotly_chart(fig_perc, use_container_width=True, config=get_plotly_config(escala))
+    
+    # Análise específica de dezembro
+    dezembro_data = evolucao[evolucao["Mes_Nome"].str.contains("Dezembro")]
+    if not dezembro_data.empty:
+        st.markdown("---")
+        st.markdown("#### 🎄 Análise Detalhada: Dezembro")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Métricas de turismo em dezembro
+            turistas_nacionais = dezembro_data[dezembro_data["Origem"] == "Outros Estados (Brasil)"]["Ingressos"].sum()
+            turistas_internacionais = dezembro_data[dezembro_data["Origem"] == "Internacional"]["Ingressos"].sum()
+            publico_rj = dezembro_data[dezembro_data["Origem"] == "Rio de Janeiro"]["Ingressos"].sum()
+            total_dezembro = dezembro_data["Ingressos"].sum()
+            
+            st.metric("Público do Rio de Janeiro", f"{int(publico_rj):,}".replace(",", "."))
+            st.metric("Turistas Nacionais (outros estados)", f"{int(turistas_nacionais):,}".replace(",", "."))
+            st.metric("Turistas Internacionais", f"{int(turistas_internacionais):,}".replace(",", "."))
+            
+            perc_turistas = ((turistas_nacionais + turistas_internacionais) / total_dezembro * 100) if total_dezembro > 0 else 0
+            st.metric("% de Turistas (nacional + internacional)", f"{perc_turistas:.1f}%")
+        
+        with col2:
+            # Gráfico de pizza para dezembro
+            fig_dez = px.pie(
+                dezembro_data,
+                values="Ingressos",
+                names="Origem",
+                title="Distribuição do Público em Dezembro",
+                hole=0.4,
+                color="Origem",
+                color_discrete_map=cores_origem
+            )
+            fig_dez.update_traces(textposition='auto', textinfo='percent+label', textfont_size=fonts['annotation'])
+            fig_dez.update_layout(
+                title_font_size=fonts['title'],
+                legend_font_size=fonts['legend'],
+                height=400
+            )
+            st.plotly_chart(fig_dez, use_container_width=True, config=get_plotly_config(escala))
+    
+    # Comparação entre meses
+    st.markdown("---")
+    st.markdown("#### 📋 Comparação Detalhada entre Meses")
+    
+    # Cria tabela pivotada
+    tabela_comparacao = evolucao.pivot_table(
+        index="Origem",
+        columns="Mes_Nome",
+        values="Percentual",
+        fill_value=0
+    ).round(1)
+    
+    # Adiciona linha de total de ingressos por mês
+    total_linha = evolucao.groupby("Mes_Nome")["Total_Mes"].first()
+    
+    st.dataframe(tabela_comparacao, use_container_width=True)
+    
+    # Mostra total por mês
+    st.markdown("**Total de Ingressos por Mês:**")
+    total_display = total_linha.to_frame().T
+    total_display.index = ["Total"]
+    st.dataframe(total_display, use_container_width=True)
+    
+    # Top estados brasileiros (excluindo RJ)
+    coluna_uf = "uf_google" if "uf_google" in df_analise.columns else "TDL Customer State"
+    if coluna_uf in df_analise.columns:
+        st.markdown("---")
+        st.markdown("#### 🗺️ Top 10 Estados de Origem (excluindo RJ)")
+        
+        estados_outros = df_analise[
+            (df_analise[coluna_uf].notna()) &
+            (~df_analise[coluna_uf].str.upper().isin(["RJ", "RIO DE JANEIRO"]))
+        ]
+        
+        if not estados_outros.empty:
+            top_estados = (
+                estados_outros.groupby(coluna_uf)["TDL Sum Tickets (B+S-A)"]
+                .sum()
+                .reset_index()
+                .sort_values("TDL Sum Tickets (B+S-A)", ascending=False)
+                .head(10)
+            )
+            top_estados.columns = ["Estado", "Ingressos_Val"]
+            
+            fig_estados = px.bar(
+                top_estados,
+                x="Estado",
+                y="Ingressos_Val",
+                title="Estados Brasileiros com Mais Turistas",
+                labels={"Estado": "Estado", "Ingressos_Val": "Ingressos"},
+                color="Ingressos_Val",
+                color_continuous_scale="Oranges"
+            )
+            
+            fig_estados.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick'],
+                showlegend=False,
+                height=400
+            )
+            st.plotly_chart(fig_estados, use_container_width=True, config=get_plotly_config(escala))
+            
+            with st.expander("📊 Ver dados da tabela"):
+                top_estados_display = top_estados.copy()
+                top_estados_display["Ingressos_Val"] = top_estados_display["Ingressos_Val"].astype(int)
+                top_estados_display.columns = ["Estado", "Ingressos"]
+                st.dataframe(top_estados_display, hide_index=True, use_container_width=True)
+    
+    # Top países (excluindo Brasil)
+    if "TDL Customer Country" in df_analise.columns:
+        st.markdown("---")
+        st.markdown("#### 🌎 Top 10 Países de Origem (excluindo Brasil)")
+        
+        paises_outros = df_analise[
+            (df_analise["TDL Customer Country"].notna()) &
+            (~df_analise["TDL Customer Country"].str.upper().isin(["BRAZIL", "BRASIL", "BR"]))
+        ]
+        
+        if not paises_outros.empty:
+            top_paises = (
+                paises_outros.groupby("TDL Customer Country")["TDL Sum Tickets (B+S-A)"]
+                .sum()
+                .reset_index()
+                .sort_values("TDL Sum Tickets (B+S-A)", ascending=False)
+                .head(10)
+            )
+            
+            fig_paises = px.bar(
+                top_paises,
+                x="TDL Customer Country",
+                y="TDL Sum Tickets (B+S-A)",
+                title="Países com Mais Turistas Internacionais",
+                labels={"TDL Customer Country": "País", "TDL Sum Tickets (B+S-A)": "Ingressos"},
+                color="TDL Sum Tickets (B+S-A)",
+                color_continuous_scale="Greens"
+            )
+            
+            fig_paises.update_layout(
+                title_font_size=fonts['title'],
+                xaxis_title_font_size=fonts['axis'],
+                yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick'],
+                showlegend=False,
+                height=400
+            )
+            st.plotly_chart(fig_paises, use_container_width=True, config=get_plotly_config(escala))
+            
+            with st.expander("📊 Ver dados da tabela"):
+                top_paises.columns = ["País", "Ingressos"]
+                top_paises["Ingressos"] = top_paises["Ingressos"].astype(int)
+                st.dataframe(top_paises, hide_index=True, use_container_width=True)
+    
+    # Botão de download
+    csv_evolucao = evolucao.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 Download Análise Completa (CSV)",
+        data=csv_evolucao,
+        file_name="analise_turismo_por_periodo.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+
+def ranking_eventos_por_publico(df_b, escala=2):
+    """Exibe ranking dos eventos ordenados por quantidade de público"""
+    st.markdown("### 🏆 Ranking de Eventos por Público")
+    
+    if df_b.empty or "TDL Event" not in df_b.columns:
+        st.info("Não há dados disponíveis para exibir o ranking.")
+        return
+    
+    # Agrupa por evento e soma ingressos e receita
+    ranking = (
+        df_b[df_b["TDL Event"].notna()]
+        .groupby("TDL Event")
+        .agg({
+            "TDL Sum Tickets (B+S-A)": "sum",
+            "TDL Sum Ticket Net Price (B+S-A)": "sum",
+            "TDL Customer CPF": "nunique"
+        })
+        .reset_index()
+    )
+    
+    ranking.columns = ["Evento", "Total de Ingressos", "Receita Total (R$)", "Clientes Únicos"]
+    ranking = ranking.sort_values("Total de Ingressos", ascending=False)
+    
+    # Calcula percentuais
+    total_geral = ranking["Total de Ingressos"].sum()
+    ranking["Percentual"] = (ranking["Total de Ingressos"] / total_geral * 100).round(1)
+    
+    # Calcula ticket médio
+    ranking["Ticket Médio (R$)"] = (ranking["Receita Total (R$)"] / ranking["Total de Ingressos"]).round(2)
+    
+    # Layout com gráfico e métricas
+    col_grafico, col_metricas = st.columns([2, 1])
+    
+    with col_grafico:
+        # Cria gráfico de barras
+        fig_ranking = px.bar(
+            ranking,
+            x="Total de Ingressos",
+            y="Evento",
+            orientation="h",
+            title="Ranking de Eventos por Quantidade de Público",
+            labels={"Total de Ingressos": "Ingressos Vendidos", "Evento": "Evento"},
+            color="Total de Ingressos",
+            color_continuous_scale="Blues",
+            text=ranking["Percentual"].apply(lambda x: f"{x}%")
+        )
+        
+        fonts = get_font_sizes(escala)
+        fig_ranking.update_traces(textposition='outside', textfont_size=fonts['annotation'])
+        fig_ranking.update_layout(
+            title_font_size=fonts['title'],
+            xaxis_title_font_size=fonts['axis'],
+            yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            height=max(400, len(ranking) * 50),
+            showlegend=False,
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        
+        st.plotly_chart(fig_ranking, use_container_width=True, config=get_plotly_config(escala))
+    
+    with col_metricas:
+        st.markdown("#### 📊 Resumo Geral")
+        st.metric("Total de Eventos", len(ranking))
+        st.metric("Total de Ingressos", f"{int(total_geral):,}".replace(",", "."))
+        st.metric("Receita Total", f"R$ {ranking['Receita Total (R$)'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        
+        if len(ranking) > 0:
+            evento_top = ranking.iloc[0]
+            st.markdown("---")
+            st.markdown("#### 🥇 Evento Líder")
+            st.write(f"**{evento_top['Evento']}**")
+            st.write(f"Ingressos: {int(evento_top['Total de Ingressos']):,}".replace(",", "."))
+            st.write(f"Participação: {evento_top['Percentual']}%")
+    
+    # Tabela detalhada
+    st.markdown("---")
+    st.markdown("#### 📋 Detalhamento Completo")
+    
+    # Formata os valores para exibição
+    ranking_display = ranking.copy()
+    ranking_display["Total de Ingressos"] = ranking_display["Total de Ingressos"].astype(int)
+    ranking_display["Receita Total (R$)"] = ranking_display["Receita Total (R$)"].apply(
+        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+    ranking_display["Ticket Médio (R$)"] = ranking_display["Ticket Médio (R$)"].apply(
+        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
+    ranking_display["Percentual"] = ranking_display["Percentual"].apply(lambda x: f"{x}%")
+    ranking_display.index = range(1, len(ranking_display) + 1)
+    
+    st.dataframe(ranking_display, use_container_width=True)
+    
+    # Botão de download
+    csv_ranking = ranking_display.to_csv(index=True, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 Download Ranking Completo (CSV)",
+        data=csv_ranking,
+        file_name="ranking_eventos_publico.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+
 def grafico_pizza_tipo_ingresso_por_evento(df_b, escala=2):
     """Exibe gráfico de pizza para avaliar o percentual do tipo de ingresso comprado para cada evento"""
     st.markdown("### 🎫 Tipo de Ingresso por Evento")
