@@ -9,7 +9,7 @@ import geopandas as gpd
 import json
 
 # Imports dos módulos de gráficos
-from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento
+from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento, ranking_eventos_por_publico, analise_turismo_por_periodo
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
 
@@ -510,6 +510,14 @@ def main():
         col_d.metric("Média de ingressos por CPF", f"{media_ingressos_por_cpf:.2f}")
         col_e.metric("Ticket médio (R$)", f"{ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col_f.metric("Clientes recorrentes", f"{qtd_recorrentes} ({perc_recorrentes:.1f}%)")
+        
+        # Ranking de eventos por público
+        st.markdown("---")
+        ranking_eventos_por_publico(df_b, escala)
+        
+        # Análise de turismo por período
+        st.markdown("---")
+        analise_turismo_por_periodo(df_b, escala)
         
         # Métricas de Ingresso Solidário
         st.markdown("---")
