@@ -12,6 +12,7 @@ import json
 from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento, ranking_eventos_por_publico, analise_turismo_por_periodo
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
+from graficos.clusters.index import analise_clusters_clientes, analise_clusters_geograficos
 
 # ==============================
 # Configuração de gráficos
@@ -380,7 +381,7 @@ def main():
     bilhetes, cred_2025, cred_2024 = load_data()
 
     # Aba de navegação
-    tab_bilhetagem, tab_credenciamento = st.tabs(["🎟 Bilhetagem", "👷 Credenciamento 2025"])
+    tab_bilhetagem, tab_clusters, tab_credenciamento = st.tabs(["🎟 Bilhetagem", "🎯 Análises de Cluster", "👷 Credenciamento 2025"])
 
     # ==============================
     # ABA 1 – BILHETAGEM
@@ -736,11 +737,51 @@ def main():
             st.info("Coluna de bairro não disponível nos dados.")
 
         # Tabela
+        st.markdown("---")
         st.markdown("#### Amostra dos dados de bilhetagem")
         st.dataframe(df_b)
 
     # ==============================
-    # ABA 2 – CREDENCIAMENTO 2025
+    # ABA 2 – ANÁLISES DE CLUSTER
+    # ==============================
+    with tab_clusters:
+        st.subheader("🎯 Análises de Cluster")
+        st.markdown("Segmentação avançada de clientes e regiões geográficas")
+        
+        # Aplica os mesmos filtros da aba de bilhetagem
+        df_cluster = bilhetes.copy()
+        
+        if evento_sel:
+            df_cluster = df_cluster[df_cluster["TDL Event"].isin(evento_sel)]
+
+        if periodo is not None and isinstance(periodo, (list, tuple)) and len(periodo) == 2:
+            ini, fim = periodo
+            df_cluster = df_cluster[
+                (df_cluster["TDL Event Date"] >= pd.to_datetime(ini)) &
+                (df_cluster["TDL Event Date"] <= pd.to_datetime(fim))
+            ]
+
+        if pais_sel and pais_col in df_cluster.columns:
+            df_cluster = df_cluster[df_cluster[pais_col].isin(pais_sel)]
+
+        if tipo_ingresso_sel and tipo_ingresso_col in df_cluster.columns:
+            df_cluster = df_cluster[df_cluster[tipo_ingresso_col].isin(tipo_ingresso_sel)]
+
+        if ra_sel:
+            df_cluster = df_cluster[df_cluster["RA"].isin(ra_sel)]
+
+        if dia_semana_sel and "dia_semana_label" in df_cluster.columns:
+            df_cluster = df_cluster[df_cluster["dia_semana_label"].isin(dia_semana_sel)]
+        
+        # Análise de Clusters de Clientes
+        analise_clusters_clientes(df_cluster, escala)
+        
+        # Análise de Clusters Geográficos
+        st.markdown("---")
+        analise_clusters_geograficos(df_cluster, escala)
+
+    # ==============================
+    # ABA 3 – CREDENCIAMENTO 2025
     # ==============================
     with tab_credenciamento:
         st.subheader("👷 Análises de Credenciamento 2025")
