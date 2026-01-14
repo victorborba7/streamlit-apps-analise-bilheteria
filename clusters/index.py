@@ -49,15 +49,20 @@ def analise_clusters_clientes(df_b, escala=2):
     # Prepara os dados
     df_analise = df_b[df_b["TDL Customer CPF"].notna()].copy()
     
-    # Ajusta valor do ingresso solidário para R$ 10,00
+    # Identifica ingressos solidários (mesma regra do app.py)
     if "TDL Ticket Type" in df_analise.columns:
         mask_solidario = df_analise["TDL Ticket Type"].str.upper().str.contains("SOLIDÁRIO", na=False)
-        df_analise.loc[mask_solidario, "TDL Sum Ticket Net Price (B+S-A)"] = 10.00
+        # Cria coluna de valor ajustado para solidários (R$ 10,00)
+        df_analise["Valor_Ajustado"] = df_analise["TDL Sum Ticket Net Price (B+S-A)"].copy()
+        df_analise.loc[mask_solidario, "Valor_Ajustado"] = df_analise.loc[mask_solidario, "TDL Sum Tickets (B+S-A)"] * 10.00
+    else:
+        df_analise["Valor_Ajustado"] = df_analise["TDL Sum Ticket Net Price (B+S-A)"]
+        mask_solidario = pd.Series([False] * len(df_analise), index=df_analise.index)
     
-    # Agrupa por cliente
+    # Agrupa por cliente usando o valor ajustado
     features_clientes = df_analise.groupby("TDL Customer CPF").agg({
         "TDL Sum Tickets (B+S-A)": "sum",  # Total de ingressos comprados
-        "TDL Sum Ticket Net Price (B+S-A)": ["sum", "mean"],  # Valor total e médio gasto
+        "Valor_Ajustado": ["sum", "mean"],  # Valor total e médio gasto (com solidário = R$ 10)
         "TDL Event": "nunique"  # Número de eventos diferentes
     }).reset_index()
     
@@ -66,7 +71,7 @@ def analise_clusters_clientes(df_b, escala=2):
     
     # Adiciona informação se comprou ingresso solidário
     if "TDL Ticket Type" in df_analise.columns:
-        solidarios = df_analise[mask_solidario].groupby("TDL Customer CPF").size().reset_index(name="Ingressos_Solidarios")
+        solidarios = df_analise[mask_solidario].groupby("TDL Customer CPF")["TDL Sum Tickets (B+S-A)"].sum().reset_index(name="Ingressos_Solidarios")
         features_clientes = features_clientes.merge(solidarios, left_on="CPF", right_on="TDL Customer CPF", how="left")
         features_clientes["Ingressos_Solidarios"] = features_clientes["Ingressos_Solidarios"].fillna(0)
         if "TDL Customer CPF" in features_clientes.columns:
