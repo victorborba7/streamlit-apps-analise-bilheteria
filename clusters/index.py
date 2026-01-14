@@ -503,6 +503,10 @@ def analise_clusters_bairros(df_b, campo_bairro, escala=2):
     # Remove bairros com poucos dados (menos de 5 ingressos)
     bairros_stats = bairros_stats[bairros_stats["Total_Ingressos"] >= 5].copy()
     
+    # Remove valores inválidos (NaN, inf, -inf)
+    bairros_stats = bairros_stats.replace([np.inf, -np.inf], np.nan)
+    bairros_stats = bairros_stats.dropna(subset=["Ticket_Medio", "Ingressos_por_Cliente"])
+    
     if len(bairros_stats) < 5:
         st.warning("Dados insuficientes para análise de clusters de bairros.")
         return
@@ -702,6 +706,10 @@ def analise_clusters_cidades(df_b, escala=2):
     
     # Remove cidades com poucos dados (menos de 10 ingressos)
     cidades_stats = cidades_stats[cidades_stats["Total_Ingressos"] >= 10].copy()
+    
+    # Remove valores inválidos (NaN, inf, -inf)
+    cidades_stats = cidades_stats.replace([np.inf, -np.inf], np.nan)
+    cidades_stats = cidades_stats.dropna(subset=["Ticket_Medio", "Ingressos_por_Cliente"])
     
     if len(cidades_stats) < 5:
         st.warning("Dados insuficientes para análise de clusters de cidades.")
