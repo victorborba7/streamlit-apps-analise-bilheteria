@@ -12,7 +12,7 @@ import json
 from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento, ranking_eventos_por_publico, analise_turismo_por_periodo
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
-from graficos.clusters.index import analise_clusters_clientes, analise_clusters_geograficos
+from clusters.index import analise_clusters_clientes, analise_clusters_geograficos
 
 # ==============================
 # Configuração de gráficos
@@ -1343,4 +1343,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
