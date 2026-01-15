@@ -405,6 +405,20 @@ def analise_turismo_por_periodo(df_b, escala=2):
     total_display.index = ["Total"]
     st.dataframe(total_display, use_container_width=True)
     
+    # Botão de download da evolução por origem
+    st.markdown("---")
+    evolucao_export = evolucao[["Mes_Nome", "Origem", "Ingressos", "Percentual", "Total_Mes"]].copy()
+    evolucao_export.columns = ["Mês", "Origem", "Ingressos", "Percentual (%)", "Total do Mês"]
+    
+    csv_evolucao = evolucao_export.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 Download Evolução do Público por Origem (CSV)",
+        data=csv_evolucao,
+        file_name="evolucao_publico_origem.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    
     # Top estados brasileiros (excluindo RJ)
     coluna_uf = "uf_google" if "uf_google" in df_analise.columns else "TDL Customer State"
     if coluna_uf in df_analise.columns:
