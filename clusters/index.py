@@ -46,23 +46,23 @@ def analise_clusters_clientes(df_b, escala=2):
         st.info("Não há dados disponíveis para análise de clusters.")
         return
     
+    # Filtra eventos excluídos da análise
+    if "TDL Event" in df_b.columns:
+        df_b = df_b[df_b["TDL Event"] != "O BAILE DA MÚSICA BRASILEIRA COM CORDAO DO BOITATA E CONVIDADOS"].copy()
+    
     # Prepara os dados
     df_analise = df_b[df_b["TDL Customer CPF"].notna()].copy()
     
-    # Identifica ingressos solidários (mesma regra do app.py)
+    # Identifica ingressos solidários
     if "TDL Ticket Type" in df_analise.columns:
         mask_solidario = df_analise["TDL Ticket Type"].str.upper().str.contains("SOLIDÁRIO", na=False)
-        # Cria coluna de valor ajustado para solidários (R$ 10,00)
-        df_analise["Valor_Ajustado"] = df_analise["TDL Sum Ticket Net Price (B+S-A)"].copy()
-        df_analise.loc[mask_solidario, "Valor_Ajustado"] = df_analise.loc[mask_solidario, "TDL Sum Tickets (B+S-A)"] * 10.00
     else:
-        df_analise["Valor_Ajustado"] = df_analise["TDL Sum Ticket Net Price (B+S-A)"]
         mask_solidario = pd.Series([False] * len(df_analise), index=df_analise.index)
     
-    # Agrupa por cliente usando o valor ajustado
+    # Agrupa por cliente
     features_clientes = df_analise.groupby("TDL Customer CPF").agg({
         "TDL Sum Tickets (B+S-A)": "sum",  # Total de ingressos comprados
-        "Valor_Ajustado": ["sum", "mean"],  # Valor total e médio gasto (com solidário = R$ 10)
+        "TDL Sum Ticket Net Price (B+S-A)": ["sum", "mean"],  # Valor total e médio gasto
         "TDL Event": "nunique"  # Número de eventos diferentes
     }).reset_index()
     
@@ -355,9 +355,9 @@ def analise_clusters_clientes(df_b, escala=2):
     st.markdown("#### 🕸️ Perfil dos Clusters (Gráfico Radar)")
     
     # Normaliza as métricas para o gráfico radar (0-100)
-    metricas_radar = cluster_stats[["Nome_Cluster", "Media_Ingressos", "Media_Valor_Total", "Media_Ticket_Medio", "Media_Num_Eventos"]].copy()
+    metricas_radar = cluster_stats[["Nome_Cluster", "Media_Ingressos", "Media_Ticket_Medio", "Media_Num_Eventos"]].copy()
     
-    for col in ["Media_Ingressos", "Media_Valor_Total", "Media_Ticket_Medio", "Media_Num_Eventos"]:
+    for col in ["Media_Ingressos", "Media_Ticket_Medio", "Media_Num_Eventos"]:
         max_val = metricas_radar[col].max()
         if max_val > 0:
             metricas_radar[f"{col}_norm"] = (metricas_radar[col] / max_val * 100).round(1)
@@ -366,12 +366,11 @@ def analise_clusters_clientes(df_b, escala=2):
     
     fig_radar = go.Figure()
     
-    categorias = ["Ingressos Médios", "Valor Total Médio", "Ticket Médio", "Eventos Médios"]
+    categorias = ["Ingressos Médios", "Ticket Médio", "Eventos Médios"]
     
     for _, row in metricas_radar.iterrows():
         valores = [
             row["Media_Ingressos_norm"],
-            row["Media_Valor_Total_norm"],
             row["Media_Ticket_Medio_norm"],
             row["Media_Num_Eventos_norm"]
         ]
@@ -453,6 +452,10 @@ def analise_clusters_geograficos(df_b, escala=2):
     if df_b.empty:
         st.info("Não há dados disponíveis para análise.")
         return
+    
+    # Filtra eventos excluídos da análise
+    if "TDL Event" in df_b.columns:
+        df_b = df_b[df_b["TDL Event"] != "O BAILE DA MÚSICA BRASILEIRA COM CORDAO DO BOITATA E CONVIDADOS"].copy()
     
     # Verifica disponibilidade dos campos geográficos
     tem_bairro = "bairro_google_norm" in df_b.columns or "bairro_google" in df_b.columns
