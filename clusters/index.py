@@ -264,7 +264,6 @@ def analise_clusters_clientes(df_b, escala=2):
             with cols[idx]:
                 st.markdown(f"### {cluster_info['Nome_Cluster']}")
                 st.metric("Clientes", f"{int(cluster_info['Quantidade_Clientes']):,}".replace(",", "."))
-                st.metric("Valor Médio Total", f"R$ {cluster_info['Media_Valor_Total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 st.metric("Ingressos Médios", f"{cluster_info['Media_Ingressos']:.1f}")
                 st.metric("Ticket Médio", f"R$ {cluster_info['Media_Ticket_Medio']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 st.metric("Eventos Médios", f"{cluster_info['Media_Num_Eventos']:.1f}")
@@ -284,13 +283,13 @@ def analise_clusters_clientes(df_b, escala=2):
     
     # Seleciona colunas principais
     cols_exibir = [
-        "Nome_Cluster", "Quantidade_Clientes", "Media_Ingressos", "Media_Valor_Total",
+        "Nome_Cluster", "Quantidade_Clientes", "Media_Ingressos",
         "Media_Ticket_Medio", "Media_Num_Eventos", "Total_Solidarios"
     ]
     
     cluster_display_final = cluster_display[cols_exibir].copy()
     cluster_display_final.columns = [
-        "Cluster", "Clientes", "Ingressos Médios", "Valor Médio Total (R$)",
+        "Cluster", "Clientes", "Ingressos Médios",
         "Ticket Médio (R$)", "Eventos Médios", "Ingressos Solidários"
     ]
     
