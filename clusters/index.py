@@ -397,32 +397,6 @@ def analise_clusters_clientes(df_b, escala=2):
     
     st.plotly_chart(fig_radar, use_container_width=True, config=get_plotly_config(escala))
     
-    # Insights e recomendações
-    st.markdown("---")
-    st.markdown("#### 💡 Insights e Recomendações")
-    
-    # Identifica o cluster com maior valor
-    cluster_maior_valor = cluster_stats.loc[cluster_stats["Total_Valor_Cluster"].idxmax()]
-    cluster_maior_qtd = cluster_stats.loc[cluster_stats["Quantidade_Clientes"].idxmax()]
-    
-    col_insight1, col_insight2 = st.columns(2)
-    
-    with col_insight1:
-        st.success(f"**🏆 Cluster Mais Valioso:** {cluster_maior_valor['Nome_Cluster']}")
-        st.write(f"- Representa {cluster_maior_valor['Quantidade_Clientes']} clientes ({cluster_maior_valor['Quantidade_Clientes']/len(features_clientes_filtered)*100:.1f}%)")
-        st.write(f"- Gera R$ {cluster_maior_valor['Total_Valor_Cluster']:,.2f} em receita")
-        st.write(f"- Ticket médio: R$ {cluster_maior_valor['Media_Ticket_Medio']:,.2f}")
-        st.write("")
-        st.write("**Recomendação:** Foque em estratégias de retenção e programas VIP para este segmento.")
-    
-    with col_insight2:
-        st.info(f"**👥 Cluster Mais Numeroso:** {cluster_maior_qtd['Nome_Cluster']}")
-        st.write(f"- Representa {cluster_maior_qtd['Quantidade_Clientes']} clientes ({cluster_maior_qtd['Quantidade_Clientes']/len(features_clientes_filtered)*100:.1f}%)")
-        st.write(f"- Valor médio por cliente: R$ {cluster_maior_qtd['Media_Valor_Total']:,.2f}")
-        st.write(f"- Potencial de crescimento: {(cluster_maior_qtd['Quantidade_Clientes'] * (cluster_maior_valor['Media_Valor_Total'] - cluster_maior_qtd['Media_Valor_Total'])):,.2f} em receita adicional")
-        st.write("")
-        st.write("**Recomendação:** Desenvolva campanhas de upselling para aumentar o valor médio deste segmento.")
-    
     # Exporta dados dos clusters
     st.markdown("---")
     features_clientes_filtered["Nome_Cluster"] = features_clientes_filtered["Cluster"].map(
