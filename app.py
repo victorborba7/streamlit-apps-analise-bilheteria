@@ -12,7 +12,7 @@ import json
 from graficos.gerais.index import grafico_vendas_ao_longo_do_tempo, analise_comportamento_compra, grafico_pizza_tipo_ingresso_por_evento, ranking_eventos_por_publico, analise_turismo_por_periodo
 from graficos.demograficos.index import analise_demografica
 from graficos.geograficos.index import mapa_brasil, mapa_estado_rj, mapa_ras_capital, grafico_bairros_por_tipo_ingresso
-from clusters.index import analise_clusters_clientes, analise_clusters_geograficos
+from graficos.clusters.index import analise_clusters_clientes, analise_clusters_geograficos
 
 # ==============================
 # Configuração de gráficos
@@ -119,34 +119,9 @@ def load_data():
         )
 
     # ==============================
-    # Bilhetagem Marisa Monte
-    # ==============================
-    # marisa = pd.read_excel(
-    #     load_file_from_github(bilhetes_url, headers),
-    #     sheet_name="MarisaMonte",
-    #     engine='openpyxl'
-    # )
-
-    # # Coluna J = índice 9
-    # marisa["CPF_LOGICO"] = marisa.iloc[:, 9].astype(str)
-
-    # # Cria estrutura compatível
-    # marisa_ajustada = pd.DataFrame({
-    #     "TDL Event": "MARISA MONTE",
-    #     "TDL Event Date": pd.to_datetime(marisa.iloc[:, 0], errors="coerce"),
-    #     "TDL Customer CPF": marisa["CPF_LOGICO"],
-    #     "TDL Sum Tickets (B+S-A)": 1,
-    #     "TDL Sum Ticket Net Price (B+S-A)": pd.to_numeric(marisa.iloc[:, 5], errors="coerce"),
-    # })
-
-    # ==============================
     # Concatenação final
     # ==============================
     bilhetes_final = bilhetes.copy()
-    # pd.concat(
-    #     [bilhetes, marisa_ajustada],
-    #     ignore_index=True
-    # )
 
     # ==============================
     # Credenciamento
@@ -512,14 +487,6 @@ def main():
         col_e.metric("Ticket médio (R$)", f"{ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col_f.metric("Clientes recorrentes", f"{qtd_recorrentes} ({perc_recorrentes:.1f}%)")
         
-        # Ranking de eventos por público
-        st.markdown("---")
-        ranking_eventos_por_publico(df_b, escala)
-        
-        # Análise de turismo por período
-        st.markdown("---")
-        analise_turismo_por_periodo(df_b, escala)
-        
         # Métricas de Ingresso Solidário
         st.markdown("---")
         st.markdown("#### 🤝 Ingresso Solidário")
@@ -577,6 +544,14 @@ def main():
             mime="text/csv",
             use_container_width=True
         )
+        
+        # Ranking de eventos por público
+        st.markdown("---")
+        ranking_eventos_por_publico(df_b, escala)
+        
+        # Análise de turismo por período
+        st.markdown("---")
+        analise_turismo_por_periodo(df_b, escala)
 
         # ==============================
         # Análise de Comportamento de Compra
@@ -1343,5 +1318,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
