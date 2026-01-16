@@ -27,11 +27,11 @@ def get_font_sizes(escala=2):
     """Retorna tamanhos de fonte base aumentados proporcionalmente à escala"""
     base_multiplier = escala / 2  # Normaliza para escala 2 como padrão
     return {
-        'title': int(24 * base_multiplier),
-        'axis': int(18 * base_multiplier),
-        'tick': int(16 * base_multiplier),
-        'legend': int(16 * base_multiplier),
-        'annotation': int(16 * base_multiplier)
+        'title': int(28 * base_multiplier),
+        'axis': int(22 * base_multiplier),
+        'tick': int(18 * base_multiplier),
+        'legend': int(20 * base_multiplier),
+        'annotation': int(18 * base_multiplier)
     }
 
 
