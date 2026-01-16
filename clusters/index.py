@@ -331,8 +331,7 @@ def analise_clusters_clientes(df_b, escala=2):
             showlegend=False,
             height=400,
             coloraxis_colorbar=dict(
-                tickfont=dict(size=fonts['tick']),
-                titlefont=dict(size=fonts['legend'])
+                tickfont=dict(size=fonts['tick'])
             )
         )
         
@@ -360,8 +359,7 @@ def analise_clusters_clientes(df_b, escala=2):
             showlegend=False,
             height=400,
             coloraxis_colorbar=dict(
-                tickfont=dict(size=fonts['tick']),
-                titlefont=dict(size=fonts['legend'])
+                tickfont=dict(size=fonts['tick'])
             )
         )
         
