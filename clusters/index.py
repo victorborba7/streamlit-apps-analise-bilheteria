@@ -162,6 +162,8 @@ def analise_clusters_clientes(df_b, escala=2):
     
     col_viz1, col_viz2 = st.columns(2)
     
+    fonts = get_font_sizes(escala)
+    
     with col_viz1:
         # Gráfico PCA
         fig_pca = px.scatter(
@@ -299,6 +301,8 @@ def analise_clusters_clientes(df_b, escala=2):
     st.markdown("---")
     st.markdown("#### 📊 Comparação entre Clusters")
     
+    fonts = get_font_sizes(escala)
+    
     col_comp1, col_comp2 = st.columns(2)
     
     with col_comp1:
@@ -352,6 +356,8 @@ def analise_clusters_clientes(df_b, escala=2):
     # Gráfico de radar para comparar perfis
     st.markdown("---")
     st.markdown("#### 🕸️ Perfil dos Clusters (Gráfico Radar)")
+    
+    fonts = get_font_sizes(escala)
     
     # Normaliza as métricas para o gráfico radar (0-100)
     metricas_radar = cluster_stats[["Nome_Cluster", "Media_Ingressos", "Media_Ticket_Medio", "Media_Num_Eventos"]].copy()
@@ -572,6 +578,8 @@ def analise_clusters_bairros(df_b, campo_bairro, escala=2):
     st.markdown("---")
     st.markdown("#### 📊 Visualização dos Clusters de Bairros")
     
+    fonts = get_font_sizes(escala)
+    
     col_viz1, col_viz2 = st.columns(2)
     
     with col_viz1:
@@ -775,6 +783,8 @@ def analise_clusters_cidades(df_b, escala=2):
     # Visualizações
     st.markdown("---")
     st.markdown("#### 📊 Visualização dos Clusters de Cidades")
+    
+    fonts = get_font_sizes(escala)
     
     col_viz1, col_viz2 = st.columns(2)
     
