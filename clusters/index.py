@@ -329,7 +329,11 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_tickfont_size=fonts['tick'],
             legend_font_size=fonts['legend'],
             showlegend=False,
-            height=400
+            height=400,
+            coloraxis_colorbar=dict(
+                tickfont=dict(size=fonts['tick']),
+                titlefont=dict(size=fonts['legend'])
+            )
         )
         
         st.plotly_chart(fig_valor, use_container_width=True, config=get_plotly_config(escala))
@@ -354,7 +358,11 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_tickfont_size=fonts['tick'],
             legend_font_size=fonts['legend'],
             showlegend=False,
-            height=400
+            height=400,
+            coloraxis_colorbar=dict(
+                tickfont=dict(size=fonts['tick']),
+                titlefont=dict(size=fonts['legend'])
+            )
         )
         
         st.plotly_chart(fig_qtd, use_container_width=True, config=get_plotly_config(escala))
