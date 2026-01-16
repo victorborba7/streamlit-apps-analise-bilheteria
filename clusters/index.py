@@ -25,13 +25,13 @@ def get_plotly_config(escala=2):
 
 def get_font_sizes(escala=2):
     """Retorna tamanhos de fonte base aumentados proporcionalmente à escala"""
-    base_multiplier = escala / 2  # Normaliza para escala 2 como padrão
+    # Multiplica diretamente pela escala para fontes maiores na exportação
     return {
-        'title': int(30 * base_multiplier),
-        'axis': int(24 * base_multiplier),
-        'tick': int(20 * base_multiplier),
-        'legend': int(20 * base_multiplier),
-        'annotation': int(20 * base_multiplier)
+        'title': int(20 * escala),
+        'axis': int(16 * escala),
+        'tick': int(14 * escala),
+        'legend': int(14 * escala),
+        'annotation': int(14 * escala)
     }
 
 
