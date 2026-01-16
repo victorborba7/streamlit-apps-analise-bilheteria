@@ -24,13 +24,14 @@ def get_plotly_config(escala=2):
 
 
 def get_font_sizes(escala=2):
-    """Retorna tamanhos de fonte base aumentados"""
+    """Retorna tamanhos de fonte base aumentados proporcionalmente à escala"""
+    base_multiplier = escala / 2  # Normaliza para escala 2 como padrão
     return {
-        'title': 24,
-        'axis': 18,
-        'tick': 16,
-        'legend': 16,
-        'annotation': 16
+        'title': int(24 * base_multiplier),
+        'axis': int(18 * base_multiplier),
+        'tick': int(16 * base_multiplier),
+        'legend': int(16 * base_multiplier),
+        'annotation': int(16 * base_multiplier)
     }
 
 
@@ -183,6 +184,7 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_title_font_size=fonts['axis'],
             xaxis_tickfont_size=fonts['tick'],
             yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             height=500
         )
         
@@ -207,6 +209,7 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_title_font_size=fonts['axis'],
             xaxis_tickfont_size=fonts['tick'],
             yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             height=500
         )
         
@@ -323,6 +326,7 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_title_font_size=fonts['axis'],
             xaxis_tickfont_size=fonts['tick'],
             yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             showlegend=False,
             height=400
         )
@@ -347,6 +351,7 @@ def analise_clusters_clientes(df_b, escala=2):
             yaxis_title_font_size=fonts['axis'],
             xaxis_tickfont_size=fonts['tick'],
             yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             showlegend=False,
             height=400
         )
@@ -537,6 +542,8 @@ def analise_clusters_bairros(df_b, campo_bairro, escala=2):
                 title_font_size=fonts['title'],
                 xaxis_title_font_size=fonts['axis'],
                 yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick'],
                 height=400
             )
             st.plotly_chart(fig_cotovelo, use_container_width=True, config=get_plotly_config(escala))
@@ -599,6 +606,9 @@ def analise_clusters_bairros(df_b, campo_bairro, escala=2):
             title_font_size=fonts['title'],
             xaxis_title_font_size=fonts['axis'],
             yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             height=450
         )
         st.plotly_chart(fig_scatter, use_container_width=True, config=get_plotly_config(escala))
@@ -620,6 +630,9 @@ def analise_clusters_bairros(df_b, campo_bairro, escala=2):
             title_font_size=fonts['title'],
             xaxis_title_font_size=fonts['axis'],
             yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             xaxis_tickangle=-45,
             height=450
         )
@@ -743,6 +756,8 @@ def analise_clusters_cidades(df_b, escala=2):
                 title_font_size=fonts['title'],
                 xaxis_title_font_size=fonts['axis'],
                 yaxis_title_font_size=fonts['axis'],
+                xaxis_tickfont_size=fonts['tick'],
+                yaxis_tickfont_size=fonts['tick'],
                 height=400
             )
             st.plotly_chart(fig_cotovelo, use_container_width=True, config=get_plotly_config(escala))
@@ -805,6 +820,9 @@ def analise_clusters_cidades(df_b, escala=2):
             title_font_size=fonts['title'],
             xaxis_title_font_size=fonts['axis'],
             yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             height=450
         )
         st.plotly_chart(fig_scatter, use_container_width=True, config=get_plotly_config(escala))
@@ -826,6 +844,9 @@ def analise_clusters_cidades(df_b, escala=2):
             title_font_size=fonts['title'],
             xaxis_title_font_size=fonts['axis'],
             yaxis_title_font_size=fonts['axis'],
+            xaxis_tickfont_size=fonts['tick'],
+            yaxis_tickfont_size=fonts['tick'],
+            legend_font_size=fonts['legend'],
             xaxis_tickangle=-45,
             height=450
         )
