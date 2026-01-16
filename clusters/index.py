@@ -24,15 +24,15 @@ def get_plotly_config(escala=2):
 
 
 def get_font_sizes(escala=2):
-    """Retorna tamanhos de fonte base aumentados proporcionalmente à escala"""
-    base_multiplier = escala / 2  # Normaliza para escala 2 como padrão
+    """Retorna tamanhos de fonte base aumentados"""
     return {
-        'title': int(28 * base_multiplier),
-        'axis': int(22 * base_multiplier),
-        'tick': int(18 * base_multiplier),
-        'legend': int(20 * base_multiplier),
-        'annotation': int(18 * base_multiplier)
+        'title': 30,
+        'axis': 24,
+        'tick': 20,
+        'legend': 20,
+        'annotation': 20
     }
+
 
 
 def analise_clusters_clientes(df_b, escala=2):
